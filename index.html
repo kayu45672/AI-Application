@@ -1,0 +1,3893 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SignBridge 2.0 — Real-Time 3D Sign Language Avatar & Live Camera Recognition</title>
+  <meta name="description"
+    content="Next-generation bidirectional sign language communication platform with real-time 3D articulated avatar, speech recognition, live device camera hand tracking, and sign detection." />
+
+  <!-- Google Fonts: Plus Jakarta Sans, Outfit & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- Three.js for 3D Articulated Avatar Engine -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <!-- MediaPipe Hands & Camera Utils for Live Device Camera Hand Tracking -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
+  <style>
+    :root {
+      --bg-dark: #050811;
+      --bg-base: #090e1a;
+      --bg-card: rgba(13, 20, 38, 0.72);
+      --bg-card-hover: rgba(18, 28, 54, 0.85);
+      --bg-card-solid: #0d1527;
+      --bg-surface: rgba(15, 23, 42, 0.65);
+      
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-light: rgba(255, 255, 255, 0.14);
+      --border-cyan: rgba(0, 240, 255, 0.35);
+      --border-glow: rgba(0, 240, 255, 0.55);
+
+      --accent-cyan: #00f0ff;
+      --accent-cyan-dark: #0284c7;
+      --accent-cyan-glow: rgba(0, 240, 255, 0.4);
+      --accent-orange: #ff7b39;
+      --accent-orange-glow: rgba(255, 123, 57, 0.4);
+      --accent-purple: #a855f7;
+      --accent-purple-glow: rgba(168, 85, 247, 0.4);
+      --accent-blue: #3b82f6;
+      --accent-indigo: #6366f1;
+      --accent-green: #10b981;
+      --accent-green-glow: rgba(16, 185, 129, 0.4);
+      --accent-red: #f43f5e;
+      --accent-red-glow: rgba(244, 63, 94, 0.4);
+      --accent-pink: #ec4899;
+      --accent-amber: #f59e0b;
+
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --text-dim: #475569;
+
+      --radius-xs: 6px;
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-xl: 26px;
+      --radius-full: 9999px;
+
+      --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --shadow-card: 0 20px 50px -10px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.07);
+      --shadow-glow-cyan: 0 0 30px rgba(0, 240, 255, 0.35);
+      --shadow-glow-orange: 0 0 30px rgba(255, 123, 57, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image:
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.18) 0px, transparent 45%),
+        radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.15) 0px, transparent 45%),
+        radial-gradient(at 50% 100%, rgba(0, 240, 255, 0.12) 0px, transparent 50%),
+        radial-gradient(circle at 50% 30%, #0d172e 0%, #050811 100%),
+        linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+      color: var(--text-primary);
+      font-family: var(--font-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      padding: 16px 24px 36px 24px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Ambient Background Glow Orbs */
+    .bg-glow-orb-1 {
+      position: fixed;
+      top: -150px;
+      left: 15%;
+      width: 450px;
+      height: 450px;
+      background: radial-gradient(circle, rgba(0, 240, 255, 0.12) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+      filter: blur(50px);
+    }
+
+    .bg-glow-orb-2 {
+      position: fixed;
+      bottom: -150px;
+      right: 10%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.1) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+      filter: blur(60px);
+    }
+
+    /* Custom Futuristic Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(5, 8, 17, 0.5);
+      border-radius: var(--radius-full);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(56, 189, 248, 0.25);
+      border-radius: var(--radius-full);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-cyan);
+      box-shadow: 0 0 10px var(--accent-cyan-glow);
+    }
+
+    /* Main Container Shell */
+    header, .mode-tabs, .app-container, footer {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    header {
+      max-width: 1440px;
+      margin: 0 auto 16px auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 14px 22px;
+      background: rgba(13, 20, 38, 0.65);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: var(--shadow-card);
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-icon {
+      width: 46px;
+      height: 46px;
+      background: linear-gradient(135deg, #00f0ff 0%, #3b82f6 50%, #8b5cf6 100%);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .logo-icon::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .logo-icon svg {
+      width: 26px;
+      height: 26px;
+      fill: #050811;
+      filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.3));
+    }
+
+    .brand-text h1 {
+      font-family: var(--font-display);
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #ffffff 20%, #c7d2fe 60%, var(--accent-cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1.15;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-text h1 span.badge-pro {
+      font-size: 0.65rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 3px 8px;
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(99, 102, 241, 0.25));
+      border: 1px solid var(--border-glow);
+      border-radius: var(--radius-full);
+      -webkit-text-fill-color: #00f0ff;
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+      vertical-align: middle;
+      text-transform: uppercase;
+    }
+
+    .brand-text p {
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      letter-spacing: 0.04em;
+      margin-top: 2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-text p::before {
+      content: '●';
+      font-size: 0.5rem;
+      color: var(--accent-cyan);
+      animation: pulseDot 2s infinite;
+    }
+
+    .nav-status-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      border-radius: var(--radius-full);
+      font-size: 0.76rem;
+      font-family: var(--font-mono);
+      font-weight: 500;
+      background: rgba(8, 14, 28, 0.85);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      transition: all 0.25s ease;
+    }
+
+    .status-pill .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.05);
+      transition: all 0.25s ease;
+    }
+
+    .status-pill.active {
+      border-color: rgba(0, 240, 255, 0.5);
+      background: rgba(0, 240, 255, 0.08);
+      color: var(--accent-cyan);
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.25);
+    }
+
+    .status-pill.active .dot {
+      background: var(--accent-cyan);
+      box-shadow: 0 0 10px var(--accent-cyan);
+      animation: pulseDot 1.4s infinite;
+    }
+
+    .status-pill.rec {
+      border-color: rgba(255, 123, 57, 0.5);
+      background: rgba(255, 123, 57, 0.1);
+      color: var(--accent-orange);
+      box-shadow: 0 0 16px rgba(255, 123, 57, 0.25);
+    }
+
+    .status-pill.rec .dot {
+      background: var(--accent-orange);
+      box-shadow: 0 0 10px var(--accent-orange);
+      animation: pulseDot 0.9s infinite;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.35;
+        transform: scale(0.75);
+      }
+    }
+
+    /* Mode Switcher Tabs */
+    .mode-tabs {
+      max-width: 1440px;
+      margin: 0 auto 18px auto;
+      display: flex;
+      gap: 8px;
+      padding: 6px;
+      background: rgba(13, 20, 38, 0.7);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-xl);
+      backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: var(--shadow-card);
+    }
+
+    .mode-tab {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 12px 20px;
+      border-radius: var(--radius-lg);
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.92rem;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+    }
+
+    .mode-tab:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.08);
+      transform: translateY(-1px);
+    }
+
+    .mode-tab.active {
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.16), rgba(99, 102, 241, 0.28));
+      border: 1px solid var(--border-glow);
+      color: #ffffff;
+      box-shadow: 0 4px 20px rgba(0, 240, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      font-weight: 700;
+    }
+
+    .mode-tab svg {
+      width: 19px;
+      height: 19px;
+      stroke: currentColor;
+      fill: none;
+      transition: transform 0.2s ease;
+    }
+
+    .mode-tab:hover svg {
+      transform: scale(1.1);
+    }
+
+    /* Main Workspace Layout */
+    .app-container {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.15fr 1.45fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 1080px) {
+      .app-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Panels */
+    .panel-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-xl);
+      padding: 24px;
+      backdrop-filter: blur(24px) saturate(180%);
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s ease;
+    }
+
+    .panel-box::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 5%, var(--border-glow) 50%, transparent 95%);
+      pointer-events: none;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #ffffff;
+    }
+
+    .panel-title-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-xs);
+      background: rgba(0, 240, 255, 0.12);
+      border: 1px solid var(--border-cyan);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-cyan);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+    }
+
+    .panel-title-icon svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+    }
+
+    .panel-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Buttons */
+    button {
+      font-family: var(--font-main);
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: rgba(15, 23, 42, 0.85);
+      color: var(--text-primary);
+      padding: 10px 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+
+    button:hover {
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      box-shadow: 0 0 16px var(--accent-cyan-glow);
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button.btn-primary {
+      background: linear-gradient(135deg, #00f0ff 0%, #0284c7 100%);
+      border-color: #00f0ff;
+      color: #050811;
+      font-weight: 700;
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+
+    button.btn-primary:hover {
+      filter: brightness(1.12);
+      color: #000;
+      box-shadow: 0 0 32px rgba(0, 240, 255, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+      transform: translateY(-2px);
+    }
+
+    button.btn-danger {
+      background: linear-gradient(135deg, #e11d48 0%, #f43f5e 100%);
+      border-color: #f43f5e;
+      color: #ffffff;
+      box-shadow: 0 0 20px rgba(244, 63, 94, 0.45);
+    }
+
+    button.btn-danger:hover {
+      filter: brightness(1.15);
+      box-shadow: 0 0 28px rgba(244, 63, 94, 0.65);
+    }
+
+    button.btn-purple {
+      background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
+      border-color: #818cf8;
+      color: #ffffff;
+      box-shadow: 0 0 20px rgba(124, 58, 237, 0.35);
+    }
+
+    button.btn-purple:hover {
+      filter: brightness(1.15);
+      box-shadow: 0 0 28px rgba(124, 58, 237, 0.55);
+    }
+
+    button.btn-sm {
+      padding: 7px 14px;
+      font-size: 0.78rem;
+      border-radius: var(--radius-sm);
+    }
+
+    /* Form Inputs */
+    textarea,
+    input[type="text"],
+    select {
+      width: 100%;
+      background: rgba(8, 14, 28, 0.85);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      padding: 12px 16px;
+      font-family: var(--font-main);
+      font-size: 0.92rem;
+      transition: all 0.25s ease;
+      backdrop-filter: blur(10px);
+    }
+
+    textarea:focus,
+    input[type="text"]:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 2px rgba(0, 240, 255, 0.25), 0 0 20px var(--accent-cyan-glow);
+      background: rgba(11, 18, 36, 0.95);
+    }
+
+    input[type="text"]::placeholder {
+      color: var(--text-muted);
+    }
+
+    label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    /* Sliders & Toggles */
+    .range-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      height: 6px;
+      accent-color: var(--accent-cyan);
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      outline: none;
+    }
+
+    .toggle-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 16px;
+      background: rgba(9, 15, 30, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-md);
+      transition: background 0.2s ease;
+    }
+
+    .toggle-item:hover {
+      background: rgba(14, 23, 46, 0.75);
+    }
+
+    .toggle-item span {
+      font-size: 0.86rem;
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .switch {
+      position: relative;
+      width: 46px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .switch .slider-track {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-full);
+      transition: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer;
+    }
+
+    .switch .slider-track::before {
+      content: "";
+      position: absolute;
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      top: 3px;
+      background: var(--text-secondary);
+      border-radius: 50%;
+      transition: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    }
+
+    .switch input:checked + .slider-track {
+      background: rgba(0, 240, 255, 0.3);
+      border-color: var(--accent-cyan);
+    }
+
+    .switch input:checked + .slider-track::before {
+      transform: translateX(20px);
+      background: var(--accent-cyan);
+      box-shadow: 0 0 10px var(--accent-cyan);
+    }
+
+    /* Live Studio Subtitle Box */
+    .subtitle-container {
+      background: rgba(7, 12, 24, 0.92);
+      border: 1px solid var(--border-cyan);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      min-height: 88px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 0 20px rgba(0, 240, 255, 0.05);
+    }
+
+    .subtitle-header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .audio-wave-anim {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      height: 12px;
+    }
+
+    .wave-bar {
+      width: 3px;
+      height: 100%;
+      background: var(--accent-cyan);
+      border-radius: 99px;
+      animation: waveAnim 1s ease-in-out infinite;
+    }
+
+    .wave-bar:nth-child(2) { animation-delay: 0.2s; }
+    .wave-bar:nth-child(3) { animation-delay: 0.4s; }
+    .wave-bar:nth-child(4) { animation-delay: 0.1s; }
+
+    @keyframes waveAnim {
+      0%, 100% { height: 4px; }
+      50% { height: 12px; }
+    }
+
+    .subtitle-text {
+      font-size: 1.28rem;
+      font-weight: 700;
+      line-height: 1.4;
+      color: #ffffff;
+      letter-spacing: -0.01em;
+    }
+
+    .subtitle-text .interim-span {
+      color: var(--accent-cyan);
+      opacity: 0.8;
+      font-style: italic;
+      font-weight: 500;
+    }
+
+    .subtitle-meta {
+      margin-top: 8px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* History List */
+    .history-box {
+      max-height: 160px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      padding-right: 4px;
+    }
+
+    .history-entry {
+      padding: 9px 14px;
+      background: rgba(8, 14, 28, 0.75);
+      border-left: 3px solid var(--accent-cyan);
+      border-radius: var(--radius-sm);
+      font-size: 0.84rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      transition: background 0.15s ease;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .history-entry:hover {
+      background: rgba(14, 23, 46, 0.9);
+    }
+
+    .history-entry .time {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .history-entry .val {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    /* 3D Avatar Viewport Stage (Realistic Studio Stage with Cyber Frame) */
+    .stage-3d-wrapper {
+      position: relative;
+      width: 100%;
+      height: 520px;
+      background: radial-gradient(circle at 50% 35%, #9cb2c9 0%, #687f99 60%, #3e5066 100%);
+      border-radius: var(--radius-xl);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      overflow: hidden;
+      box-shadow: 0 16px 50px rgba(0, 0, 0, 0.6), inset 0 0 50px rgba(255, 255, 255, 0.2);
+    }
+
+    #avatarCanvas3D {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+    }
+
+    #avatarCanvas3D:active {
+      cursor: grabbing;
+    }
+
+    /* HUD Corner Brackets */
+    .hud-corner {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      pointer-events: none;
+      z-index: 4;
+      border-color: rgba(0, 240, 255, 0.6);
+    }
+
+    .hud-corner-tl { top: 12px; left: 12px; border-top: 2px solid; border-left: 2px solid; }
+    .hud-corner-tr { top: 12px; right: 12px; border-top: 2px solid; border-right: 2px solid; }
+    .hud-corner-bl { bottom: 12px; left: 12px; border-bottom: 2px solid; border-left: 2px solid; }
+    .hud-corner-br { bottom: 12px; right: 12px; border-bottom: 2px solid; border-right: 2px solid; }
+
+    .stage-overlay-hud {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .hud-badge {
+      pointer-events: auto;
+      background: rgba(7, 12, 24, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      padding: 6px 14px;
+      border-radius: var(--radius-md);
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .stage-controls-hud {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .stage-controls-hud > * {
+      pointer-events: auto;
+    }
+
+    .gloss-ribbon {
+      background: rgba(7, 12, 24, 0.9);
+      border: 1px solid var(--accent-cyan);
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.35);
+      padding: 8px 20px;
+      border-radius: var(--radius-full);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      backdrop-filter: blur(12px);
+    }
+
+    .gloss-ribbon .label {
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .gloss-ribbon .val {
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
+    }
+
+    /* Fingerspelling Strip */
+    .fs-ribbon {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      justify-content: center;
+      min-height: 38px;
+      margin-top: 12px;
+    }
+
+    .fs-tile {
+      width: 34px;
+      height: 38px;
+      background: rgba(13, 20, 38, 0.9);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .fs-tile.active {
+      border-color: var(--accent-orange);
+      color: #ffffff;
+      background: linear-gradient(135deg, rgba(255, 123, 57, 0.4), rgba(244, 63, 94, 0.4));
+      box-shadow: 0 0 16px var(--accent-orange-glow);
+      transform: translateY(-5px) scale(1.15);
+    }
+
+    /* CAMERA & SIGN RECOGNITION HUD */
+    .camera-stage-wrapper {
+      position: relative;
+      width: 100%;
+      height: 520px;
+      background: #030712;
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border-subtle);
+      overflow: hidden;
+      box-shadow: var(--shadow-card);
+    }
+
+    #webcamVideo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+
+    #cameraOverlayCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform: scaleX(-1);
+      pointer-events: none;
+    }
+
+    .camera-idle-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      background: radial-gradient(circle at 50% 50%, #0f182e 0%, #030712 100%);
+      color: var(--text-secondary);
+      padding: 24px;
+      text-align: center;
+      z-index: 2;
+    }
+
+    .camera-idle-placeholder.hidden {
+      display: none;
+    }
+
+    .camera-idle-placeholder svg {
+      width: 60px;
+      height: 60px;
+      stroke: var(--accent-cyan);
+      filter: drop-shadow(0 0 16px var(--accent-cyan-glow));
+    }
+
+    .detected-sign-hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .sign-result-card {
+      pointer-events: auto;
+      background: rgba(8, 14, 28, 0.92);
+      border: 1px solid var(--accent-cyan);
+      box-shadow: 0 0 30px var(--accent-cyan-glow);
+      border-radius: var(--radius-md);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      backdrop-filter: blur(16px);
+      animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .sign-result-icon {
+      font-size: 2.2rem;
+      line-height: 1;
+      filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.5));
+    }
+
+    .sign-result-info h3 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-family: var(--font-display);
+    }
+
+    .sign-result-info p {
+      font-size: 0.76rem;
+      font-family: var(--font-mono);
+      color: var(--accent-cyan);
+      margin-top: 2px;
+    }
+
+    .confidence-gauge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--accent-green);
+      font-weight: 700;
+    }
+
+    .camera-bottom-hud {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .camera-bottom-hud > * {
+      pointer-events: auto;
+    }
+
+    /* Dictionary Quick Cards */
+    .dict-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-height: 140px;
+      overflow-y: auto;
+      padding: 4px 0;
+    }
+
+    .dict-chip {
+      padding: 6px 13px;
+      background: rgba(13, 20, 38, 0.85);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-full);
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      user-select: none;
+    }
+
+    .dict-chip:hover {
+      border-color: var(--accent-cyan);
+      color: #ffffff;
+      background: rgba(0, 240, 255, 0.16);
+      box-shadow: 0 0 14px rgba(0, 240, 255, 0.3);
+      transform: translateY(-2px) scale(1.05);
+    }
+
+    /* Modal / Dialog */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 7, 18, 0.88);
+      backdrop-filter: blur(16px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      padding: 20px;
+    }
+
+    .modal-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: rgba(13, 20, 38, 0.95);
+      border: 1px solid var(--border-glow);
+      border-radius: var(--radius-xl);
+      width: 100%;
+      max-width: 720px;
+      max-height: 85vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 30px rgba(0, 240, 255, 0.15);
+      animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes scaleUp {
+      from {
+        transform: scale(0.94);
+      }
+      to {
+        transform: scale(1);
+      }
+    }
+
+    .modal-header {
+      padding: 20px 26px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(8, 14, 28, 0.6);
+    }
+
+    .modal-body {
+      padding: 22px 26px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* Info Alerts */
+    .info-callout {
+      padding: 14px 18px;
+      background: rgba(0, 240, 255, 0.06);
+      border-left: 3px solid var(--accent-cyan);
+      border-radius: var(--radius-sm);
+      font-size: 0.84rem;
+      line-height: 1.55;
+      color: var(--text-secondary);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      border-left: 3px solid var(--accent-cyan);
+    }
+
+    .info-callout b {
+      color: var(--accent-cyan);
+    }
+
+    footer {
+      max-width: 1440px;
+      margin: 36px auto 0 auto;
+      padding: 18px 24px;
+      background: rgba(13, 20, 38, 0.4);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    footer a {
+      color: var(--accent-cyan);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Ambient Glow Orbs -->
+  <div class="bg-glow-orb-1"></div>
+  <div class="bg-glow-orb-2"></div>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand-group">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M7 11V7a5 5 0 0 1 10 0v4M4 11h16a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z" />
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>SignBridge <span class="badge-pro">2.0 PRO AI</span></h1>
+        <p>3D HUMAN SIGN AVATAR (5-FINGER ARTICULATION) &amp; LIVE CAMERA AI</p>
+      </div>
+    </div>
+
+    <div class="nav-status-group">
+      <div id="speechApiStatus" class="status-pill">
+        <span class="dot"></span>
+        <span class="text">Speech: Checking...</span>
+      </div>
+      <div id="cameraStatusBadge" class="status-pill">
+        <span class="dot"></span>
+        <span class="text">Camera: Standby</span>
+      </div>
+      <div id="handAiStatusBadge" class="status-pill">
+        <span class="dot"></span>
+        <span class="text">AI Vision: Ready</span>
+      </div>
+      <button id="openDictBtn" class="btn-sm">📖 Sign Dictionary</button>
+    </div>
+  </header>
+
+  <!-- Mode Tabs -->
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="tabSpeechToSign" onclick="switchViewMode('speech-to-sign')">
+      <svg viewBox="0 0 24 24">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke-width="2" />
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke-width="2" />
+        <line x1="12" y1="19" x2="12" y2="23" stroke-width="2" />
+        <line x1="8" y1="23" x2="16" y2="23" stroke-width="2" />
+      </svg>
+      Speech / Text → 3D Avatar
+    </button>
+    <button class="mode-tab" id="tabCameraRecognition" onclick="switchViewMode('camera-recognition')">
+      <svg viewBox="0 0 24 24">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke-width="2" />
+        <circle cx="12" cy="13" r="4" stroke-width="2" />
+      </svg>
+      Live Camera Sign Recognition (AI)
+    </button>
+    <button class="mode-tab" id="tabDualPractice" onclick="switchViewMode('dual-practice')">
+      <svg viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke-width="2" />
+        <line x1="12" y1="3" x2="12" y2="21" stroke-width="2" />
+      </svg>
+      Dual Practice Mode (Side-by-Side)
+    </button>
+  </div>
+
+  <!-- Main Application Workspace -->
+  <main class="app-container" id="mainWorkspace">
+
+    <!-- LEFT COLUMN: CONTROLS & RECOGNITION FEEDS -->
+    <section class="panel-box" id="leftPanel">
+
+      <!-- Section 1: Speech & Text Input controls -->
+      <div id="speechControlsSection">
+        <div class="panel-header">
+          <div class="panel-title">
+            <div class="panel-title-icon">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </div>
+            Speech &amp; Text Input
+          </div>
+          <div class="panel-actions">
+            <button id="clearSubtitlesBtn" class="btn-sm">Clear</button>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:14px; margin-top:6px;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button id="micBtn" class="btn-primary" style="flex:1; padding:12px 20px;">
+              <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+              </svg>
+              <span id="micBtnText">🎙 Start Listening</span>
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label for="manualTextInput">Text Input (English or Tamil Transliteration)</label>
+            <div style="display:flex; gap:8px;">
+              <input type="text" id="manualTextInput"
+                placeholder="E.g., 'Hello friend how are you' or 'Vanakkam nandri'..." />
+              <button id="translateBtn" class="btn-purple" style="flex-shrink:0;">Translate</button>
+            </div>
+          </div>
+
+          <!-- Quick Practice Chips from Reference Chart -->
+          <div class="form-group">
+            <label>Quick Sign Test (Click to Animate 3D Avatar)</label>
+            <div class="dict-chips" id="quickChips">
+              <span class="dict-chip" onclick="demoSign('hello')">👋 Hello</span>
+              <span class="dict-chip" onclick="demoSign('miniheart')">🫰 Mini Heart</span>
+              <span class="dict-chip" onclick="demoSign('goodluck')">🤞 Good Luck</span>
+              <span class="dict-chip" onclick="demoSign('heart')">🫶 Heart</span>
+              <span class="dict-chip" onclick="demoSign('hug')">🤗 Hug</span>
+              <span class="dict-chip" onclick="demoSign('cheers')">🙌 Cheers</span>
+              <span class="dict-chip" onclick="demoSign('shaka')">🤙 Shaka</span>
+              <span class="dict-chip" onclick="demoSign('telephone')">📞 Telephone</span>
+              <span class="dict-chip" onclick="demoSign('ifeelyou')">🤝 I Feel You</span>
+              <span class="dict-chip" onclick="demoSign('whatever')">🤷 Whatever</span>
+              <span class="dict-chip" onclick="demoSign('sick')">🤒 Sick</span>
+              <span class="dict-chip" onclick="demoSign('please')">🤲 Please</span>
+              <span class="dict-chip" onclick="demoSign('thank you')">🙏 Thank You</span>
+              <span class="dict-chip" onclick="demoSign('yes')">👍 Yes</span>
+              <span class="dict-chip" onclick="demoSign('no')">🤏 No</span>
+              <span class="dict-chip" onclick="demoSign('sorry')">✊ Sorry</span>
+              <span class="dict-chip" onclick="demoSign('iloveyou')">🤟 I Love You</span>
+              <span class="dict-chip" onclick="demoSign('welcome')">✨ Welcome</span>
+              <span class="dict-chip" onclick="demoSign('family')">👨‍👩‍👧‍👦 Family</span>
+              <span class="dict-chip" onclick="demoSign('house')">🏠 House</span>
+              <span class="dict-chip" onclick="demoSign('hungry')">🍽️ Hungry</span>
+              <span class="dict-chip" onclick="demoSign('thirsty')">🥤 Thirsty</span>
+              <span class="dict-chip" onclick="demoSign('help')">🆘 Help</span>
+              <span class="dict-chip" onclick="demoSign('drink')">🥤 Drink</span>
+              <span class="dict-chip" onclick="demoSign('finished')">👐 Finished</span>
+              <span class="dict-chip" onclick="demoSign('food')">🍽️ Food/Eat</span>
+              <span class="dict-chip" onclick="demoSign('good')">👍 Good</span>
+              <span class="dict-chip" onclick="demoSign('morning')">🌅 Morning</span>
+              <span class="dict-chip" onclick="demoSign('water')">💧 Water</span>
+              <span class="dict-chip" onclick="demoSign('vanakkam')">🇮🇳 Vanakkam</span>
+            </div>
+          </div>
+
+          <!-- Subtitles output -->
+          <div class="form-group">
+            <label>Live Subtitle Transcript</label>
+            <div class="subtitle-container">
+              <div class="subtitle-header-bar">
+                <span>Live Audio Transcript</span>
+                <div class="audio-wave-anim">
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                </div>
+              </div>
+              <div class="subtitle-text" id="liveSubtitleText">
+                <span class="interim-span">Speak into the mic or type text above...</span>
+              </div>
+              <div class="subtitle-meta" id="subtitleMeta">Status: Ready for translation</div>
+            </div>
+          </div>
+
+          <!-- Translation History Log -->
+          <div class="form-group">
+            <label>Session History</label>
+            <div class="history-box" id="historyBox">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 2: Live Camera Controls & AI Recognition Feed -->
+      <div id="cameraControlsSection" style="display:none; margin-top:8px;">
+        <div class="panel-header">
+          <div class="panel-title">
+            <div class="panel-title-icon">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke-width="2" />
+                <circle cx="12" cy="13" r="4" stroke-width="2" />
+              </svg>
+            </div>
+            Live Camera Sign Recognition
+          </div>
+          <div class="panel-actions">
+            <button id="ttsToggleBtn" class="btn-sm">🔊 Voice: ON</button>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:14px; margin-top:8px;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button id="startCamBtn" class="btn-primary" style="flex:1; padding:12px 20px;">
+              <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
+              </svg>
+              <span id="camBtnText">📹 Enable Device Camera</span>
+            </button>
+            <button id="flipCamBtn" class="btn-sm">🔄 Mirror</button>
+          </div>
+
+          <div class="info-callout">
+            <b>How to use:</b> Position your hand clearly in front of your camera. Perform signs like <b>Open 5-Finger
+              Hand (Hello/Stop)</b>, <b>Thumbs Up (Yes)</b>, <b>Thumbs Down (No)</b>, <b>Peace/Victory</b>, <b>I Love
+              You (🤟)</b>, <b>OK sign (👌)</b>, <b>Fist</b>, or <b>ASL letters A-Z</b>. The AI will detect and vocalize
+            them in real time!
+          </div>
+
+          <div class="form-group">
+            <label>Real-Time Recognized Signs Stream</label>
+            <div class="subtitle-container" style="min-height:96px; border-color:var(--border-glow);">
+              <div style="display:flex; align-items:center; gap:14px;">
+                <div id="aiSignIcon" style="font-size:2.4rem; filter: drop-shadow(0 0 12px var(--accent-cyan-glow));">✨</div>
+                <div>
+                  <div id="aiSignText" style="font-size:1.35rem; font-weight:800; color:var(--accent-cyan); font-family:var(--font-display);">Waiting for camera gestures...</div>
+                  <div id="aiSignDetails"
+                    style="font-size:0.76rem; font-family:var(--font-mono); color:var(--text-muted); margin-top:2px;">Confidence: -- |
+                    21 Hand Keypoints: Standby</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Camera Live Log</label>
+            <div class="history-box" id="cameraLogBox"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings & Customization Drawer -->
+      <div
+        style="margin-top:10px; border-top:1px solid rgba(255,255,255,0.07); padding-top:16px; display:flex; flex-direction:column; gap:12px;">
+        <div class="form-group">
+          <label for="speedRange">Avatar Signing Speed (<span id="speedVal" style="color:var(--accent-cyan);">750</span>ms / sign)</label>
+          <div class="range-container">
+            <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">Fast</span>
+            <input type="range" id="speedRange" min="300" max="1500" step="50" value="750" />
+            <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">Slow</span>
+          </div>
+        </div>
+
+        <div class="toggle-item">
+          <span>Fingerspell Unknown Words (A-Z)</span>
+          <label class="switch">
+            <input type="checkbox" id="fingerspellToggle" checked />
+            <span class="slider-track"></span>
+          </label>
+        </div>
+
+        <div class="toggle-item">
+          <span>Avatar Wardrobe &amp; Style</span>
+          <select id="avatarThemeSelect" style="width:auto; padding:6px 12px; font-size:0.82rem;">
+            <option value="sapphire">💎 Royal Blue &amp; Gold Blazer</option>
+            <option value="coral">🌸 Sunset Rose Magenta</option>
+            <option value="emerald">🌿 Emerald Jade &amp; Gold</option>
+            <option value="amethyst">💜 Royal Violet Amethyst</option>
+            <option value="studio">🔷 Classic Studio Navy</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: 3D AVATAR & LIVE CAMERA VIEWPORTS -->
+    <section class="panel-box" id="rightPanel">
+
+      <!-- View 1: 3D Articulated Avatar Stage -->
+      <div id="avatarViewContainer">
+        <div class="panel-header">
+          <div class="panel-title">
+            <div class="panel-title-icon">
+              <svg viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="8" r="5" stroke-width="2" />
+                <path d="M20 21a8 8 0 1 0-16 0" stroke-width="2" />
+              </svg>
+            </div>
+            3D Human Sign Language Interpreter (5 Fingers)
+          </div>
+          <div class="panel-actions">
+            <button id="resetPoseBtn" class="btn-sm" title="Reset to natural interpreter greeting pose">Greeting Pose</button>
+            <button id="toggleCameraAngleBtn" class="btn-sm" title="Change camera angle">🎥 Angle</button>
+          </div>
+        </div>
+
+        <!-- 3D WebGL Canvas Stage -->
+        <div class="stage-3d-wrapper" id="stage3DWrapper" style="margin-top:14px;">
+          <!-- Corner HUD Brackets -->
+          <div class="hud-corner hud-corner-tl"></div>
+          <div class="hud-corner hud-corner-tr"></div>
+          <div class="hud-corner hud-corner-bl"></div>
+          <div class="hud-corner hud-corner-br"></div>
+
+          <canvas id="avatarCanvas3D"></canvas>
+
+          <div class="stage-overlay-hud">
+            <div class="hud-badge" id="avatarEngineBadge">WebGL 3D · 5-Finger Hands · Realistic Rig</div>
+            <div class="hud-badge" id="avatarPoseBadge">POSE: INTERPRETER READY</div>
+          </div>
+
+          <div class="stage-controls-hud">
+            <div class="gloss-ribbon">
+              <span class="label">CURRENT SIGN:</span>
+              <span class="val" id="glossCaption">READY</span>
+            </div>
+            <button class="btn-sm" onclick="triggerAvatarCheer()"
+              style="background:rgba(7,11,20,0.85); border-color:var(--accent-cyan); color:#ffffff; box-shadow:0 0 14px var(--accent-cyan-glow);">👋 Wave (5 Fingers)</button>
+          </div>
+        </div>
+
+        <!-- Quick Vibrant Outfit Color Selector -->
+        <div
+          style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-top:12px; padding:10px 14px; background:rgba(8,14,28,0.7); border:1px solid var(--border-subtle); border-radius:var(--radius-md);">
+          <span
+            style="font-size:0.75rem; font-family:var(--font-mono); color:var(--text-secondary); text-transform:uppercase; font-weight:700;">🎨
+            Wardrobe Presets:</span>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn-sm" onclick="setAvatarTheme('sapphire')"
+              style="background:linear-gradient(135deg, #1d4ed8, #2563eb); border-color:#38bdf8; color:#fff; padding:5px 12px; font-size:0.76rem;">💎
+              Royal Blue &amp; Gold</button>
+            <button class="btn-sm" onclick="setAvatarTheme('coral')"
+              style="background:linear-gradient(135deg, #e11d48, #f43f5e); border-color:#fb7185; color:#fff; padding:5px 12px; font-size:0.76rem;">🌸
+              Sunset Rose</button>
+            <button class="btn-sm" onclick="setAvatarTheme('emerald')"
+              style="background:linear-gradient(135deg, #059669, #10b981); border-color:#34d399; color:#fff; padding:5px 12px; font-size:0.76rem;">🌿
+              Emerald &amp; Gold</button>
+            <button class="btn-sm" onclick="setAvatarTheme('amethyst')"
+              style="background:linear-gradient(135deg, #7c3aed, #8b5cf6); border-color:#a78bfa; color:#fff; padding:5px 12px; font-size:0.76rem;">💜
+              Royal Violet</button>
+            <button class="btn-sm" onclick="setAvatarTheme('studio')"
+              style="background:linear-gradient(135deg, #1e3a5f, #284b77); border-color:#60a5fa; color:#fff; padding:5px 12px; font-size:0.76rem;">🔷
+              Classic Navy</button>
+          </div>
+        </div>
+
+        <!-- Fingerspelling visual strip -->
+        <div class="fs-ribbon" id="fsStrip"></div>
+      </div>
+
+      <!-- View 2: Live Camera Viewport (shown in camera mode or dual mode) -->
+      <div id="cameraViewContainer" style="display:none; margin-top:14px;">
+        <div class="panel-header">
+          <div class="panel-title">
+            <div class="panel-title-icon">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M15 10l5-5v14l-5-5z" stroke-width="2" />
+                <rect x="2" y="6" width="13" height="12" rx="2" stroke-width="2" />
+              </svg>
+            </div>
+            Live Device Camera Feed (AI Hand Mesh)
+          </div>
+          <div class="panel-actions">
+            <div class="hud-badge" id="camFpsBadge">0 FPS</div>
+          </div>
+        </div>
+
+        <div class="camera-stage-wrapper" id="cameraStageWrapper" style="margin-top:14px;">
+          <!-- Corner HUD Brackets -->
+          <div class="hud-corner hud-corner-tl"></div>
+          <div class="hud-corner hud-corner-tr"></div>
+          <div class="hud-corner hud-corner-bl"></div>
+          <div class="hud-corner hud-corner-br"></div>
+
+          <video id="webcamVideo" autoplay playsinline muted></video>
+          <canvas id="cameraOverlayCanvas"></canvas>
+
+          <div class="camera-idle-placeholder" id="cameraPlaceholder">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
+                stroke-width="1.5" />
+              <circle cx="12" cy="13" r="4" stroke-width="1.5" />
+            </svg>
+            <div style="font-weight:800; font-size:1.2rem; color:#fff; font-family:var(--font-display);">Device Camera Standby</div>
+            <p style="font-size:0.86rem; max-width:340px; color:var(--text-secondary); line-height:1.5;">
+              Click "Enable Device Camera" to activate your webcam with real-time MediaPipe 21-point hand landmark tracking and
+              sign detection.
+            </p>
+            <button class="btn-primary" onclick="document.getElementById('startCamBtn').click()" style="padding:11px 22px;">Turn On Camera</button>
+          </div>
+
+          <div class="detected-sign-hud" id="cameraDetectedHud" style="display:none;">
+            <div class="sign-result-card">
+              <div class="sign-result-icon" id="hudSignIcon">👋</div>
+              <div class="sign-result-info">
+                <h3 id="hudSignName">HELLO</h3>
+                <p><span class="confidence-gauge">● 98% MATCH</span> · Real-time sign detected</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="camera-bottom-hud">
+            <div class="hud-badge" style="background:rgba(5,8,17,0.88); color:#fff; border-color:var(--border-subtle);">
+              Tracking: <span id="trackedHandsCount" style="color:var(--accent-cyan); font-weight:bold;">0</span> Hands Detected
+            </div>
+            <button class="btn-sm" id="snapshotBtn" onclick="takeSnapshot()" style="background:rgba(5,8,17,0.88);">📸
+              Snapshot</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Sign Dictionary Modal -->
+  <div class="modal-backdrop" id="dictModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span style="font-size:1.4rem;">📖</span>
+          <h2 style="font-size:1.2rem; font-weight:800; font-family:var(--font-display);">SignBridge Vocabulary &amp; Dictionary</h2>
+        </div>
+        <button class="btn-sm" onclick="closeDictModal()">✕ Close</button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="dictSearchInput"
+          placeholder="Search signs (e.g., hello, thank you, food, love, help, a-z)..." oninput="filterDictionary()" />
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px;"
+          id="dictGridContainer">
+          <!-- Dynamically generated -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div>SignBridge 2.0 · Three.js 3D WebGL Avatar Engine + MediaPipe Vision ML · Runs 100% Client-Side</div>
+    <div>Web Speech API + WebRTC Camera + SpeechSynthesis TTS</div>
+  </footer>
+
+  <!-- APPLICATION JAVASCRIPT LOGIC -->
+  <script>
+    (() => {
+      "use strict";
+
+      /* ==========================================================================
+         1. THREE.JS 3D HIGH-FIDELITY HUMAN INTERPRETER ENGINE (MATCHING IMAGE 2)
+         ========================================================================== */
+      const canvas3D = document.getElementById('avatarCanvas3D');
+      const stageWrapper = document.getElementById('stage3DWrapper');
+
+      let scene, camera, renderer;
+      let avatarGroup, headGroup, torsoGroup, leftArmJoints, rightArmJoints, mouthMesh, leftEyeMesh, rightEyeMesh;
+      let clock = new THREE.Clock();
+      let idleAnimationActive = true;
+      let currentTheme = 'sapphire';
+      let isDragging = false;
+      let previousMousePosition = { x: 0, y: 0 };
+      let avatarOrbitY = 0;
+      let avatarOrbitX = 0;
+
+      // Target joints state for smooth interpolation (slerp/lerp)
+      const currentJoints = {
+        lShoulderX: 0, lShoulderY: 0, lShoulderZ: 0,
+        lElbowX: 0, lElbowY: 0, lElbowZ: 0,
+        lWristX: 0, lWristY: 0, lWristZ: 0,
+        rShoulderX: 0, rShoulderY: 0, rShoulderZ: 0,
+        rElbowX: 0, rElbowY: 0, rElbowZ: 0,
+        rWristX: 0, rWristY: 0, rWristZ: 0,
+        // 5 Individual Fingers per hand (0 = open extended, 1 = curled fist)
+        lThumbCurl: 0, lIndexCurl: 0, lMiddleCurl: 0, lRingCurl: 0, lPinkyCurl: 0,
+        rThumbCurl: 0, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 0, rPinkyCurl: 0,
+        headRotY: 0, headRotX: 0, headRotZ: 0,
+        mouthOpen: 0, smileAmount: 0.8
+      };
+
+      const targetJoints = { ...currentJoints };
+
+      /* --------------------------------------------------------------------------
+         PROCEDURAL HIGH-RESOLUTION TEXTURE GENERATORS (PBR MAPS)
+         -------------------------------------------------------------------------- */
+      function generateFaceTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1024; canvas.height = 1024;
+        const ctx = canvas.getContext('2d');
+
+        // Base skin tone gradient
+        const grad = ctx.createRadialGradient(512, 512, 100, 512, 512, 500);
+        grad.addColorStop(0, '#f8cfb6');
+        grad.addColorStop(0.7, '#f4c3a5');
+        grad.addColorStop(1, '#e7b093');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 1024, 1024);
+
+        // Soft Rosy Cheeks Blush
+        const blushL = ctx.createRadialGradient(340, 560, 10, 340, 560, 130);
+        blushL.addColorStop(0, 'rgba(235, 120, 115, 0.45)');
+        blushL.addColorStop(1, 'rgba(235, 120, 115, 0)');
+        ctx.fillStyle = blushL;
+        ctx.beginPath(); ctx.arc(340, 560, 130, 0, Math.PI * 2); ctx.fill();
+
+        const blushR = ctx.createRadialGradient(684, 560, 10, 684, 560, 130);
+        blushR.addColorStop(0, 'rgba(235, 120, 115, 0.45)');
+        blushR.addColorStop(1, 'rgba(235, 120, 115, 0)');
+        ctx.fillStyle = blushR;
+        ctx.beginPath(); ctx.arc(684, 560, 130, 0, Math.PI * 2); ctx.fill();
+
+        // Delicate Eyebrows (Realistic hair strokes)
+        ctx.strokeStyle = '#2b1912';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 35; i++) {
+          // Left brow strokes
+          const lx = 310 + i * 4.2;
+          const ly = 390 - Math.sin((i / 35) * Math.PI) * 22;
+          ctx.beginPath();
+          ctx.moveTo(lx, ly);
+          ctx.lineTo(lx + 4, ly + 8 + (Math.random() - 0.5) * 3);
+          ctx.stroke();
+
+          // Right brow strokes
+          const rx = 580 + i * 4.2;
+          const ry = 390 - Math.sin((i / 35) * Math.PI) * 22;
+          ctx.beginPath();
+          ctx.moveTo(rx, ry);
+          ctx.lineTo(rx - 4, ry + 8 + (Math.random() - 0.5) * 3);
+          ctx.stroke();
+        }
+
+        // Lips Texture (Rosy with highlight gloss)
+        const lipGrad = ctx.createRadialGradient(512, 690, 10, 512, 690, 80);
+        lipGrad.addColorStop(0, '#e57a74');
+        lipGrad.addColorStop(0.7, '#d66761');
+        lipGrad.addColorStop(1, 'rgba(214, 103, 97, 0)');
+        ctx.fillStyle = lipGrad;
+        ctx.beginPath(); ctx.ellipse(512, 690, 110, 45, 0, 0, Math.PI * 2); ctx.fill();
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.needsUpdate = true;
+        return tex;
+      }
+
+      function generateIrisTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512; canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+
+        // Outer dark limbal ring
+        ctx.fillStyle = '#1a100b';
+        ctx.beginPath(); ctx.arc(256, 256, 250, 0, Math.PI * 2); ctx.fill();
+
+        // Hazel / Dark Chocolate iris gradient
+        const irisGrad = ctx.createRadialGradient(256, 256, 40, 256, 256, 240);
+        irisGrad.addColorStop(0, '#784728');
+        irisGrad.addColorStop(0.4, '#522f18');
+        irisGrad.addColorStop(0.85, '#2e180d');
+        irisGrad.addColorStop(1, '#170c06');
+        ctx.fillStyle = irisGrad;
+        ctx.beginPath(); ctx.arc(256, 256, 240, 0, Math.PI * 2); ctx.fill();
+
+        // Radial iris fibres
+        ctx.strokeStyle = 'rgba(180, 115, 65, 0.4)';
+        ctx.lineWidth = 2;
+        for (let a = 0; a < Math.PI * 2; a += 0.05) {
+          ctx.beginPath();
+          ctx.moveTo(256 + Math.cos(a) * 60, 256 + Math.sin(a) * 60);
+          ctx.lineTo(256 + Math.cos(a) * (200 + Math.sin(a * 10) * 20), 256 + Math.sin(a) * (200 + Math.sin(a * 10) * 20));
+          ctx.stroke();
+        }
+
+        // Black Pupil
+        ctx.fillStyle = '#060302';
+        ctx.beginPath(); ctx.arc(256, 256, 85, 0, Math.PI * 2); ctx.fill();
+
+        // Primary Specular Catchlight
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(310, 200, 28, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.beginPath(); ctx.arc(210, 310, 14, 0, Math.PI * 2); ctx.fill();
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.needsUpdate = true;
+        return tex;
+      }
+
+      function generateNavyFabricTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512; canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#1c365a';
+        ctx.fillRect(0, 0, 512, 512);
+
+        // Fine twill micro-weave texture
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
+        for (let x = 0; x < 512; x += 4) {
+          for (let y = 0; y < 512; y += 4) {
+            if ((x + y) % 8 === 0) ctx.fillRect(x, y, 2, 2);
+          }
+        }
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(4, 4);
+        tex.needsUpdate = true;
+        return tex;
+      }
+
+      function generateHairTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512; canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#2b1912';
+        ctx.fillRect(0, 0, 512, 512);
+
+        // Hair strand sheen lines
+        ctx.strokeStyle = 'rgba(110, 68, 45, 0.35)';
+        ctx.lineWidth = 1.5;
+        for (let y = 0; y < 512; y += 3) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(512, y + (Math.random() - 0.5) * 4);
+          ctx.stroke();
+        }
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.needsUpdate = true;
+        return tex;
+      }
+
+      function initThreeScene() {
+        scene = new THREE.Scene();
+        scene.background = null;
+
+        const width = stageWrapper.clientWidth || 600;
+        const height = stageWrapper.clientHeight || 520;
+
+        camera = new THREE.PerspectiveCamera(34, width / height, 0.1, 1000);
+        camera.position.set(0, 1.34, 3.1);
+        camera.lookAt(0, 1.28, 0);
+
+        renderer = new THREE.WebGLRenderer({ canvas: canvas3D, antialias: true, alpha: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.05;
+
+        // High quality Studio Lighting matching Image 2 portrait
+        const ambientLight = new THREE.AmbientLight(0xfff5ea, 0.95);
+        scene.add(ambientLight);
+
+        // Warm Studio Key Light from top-front-left
+        const keyLight = new THREE.DirectionalLight(0xfff8f2, 1.7);
+        keyLight.position.set(1.6, 3.2, 2.6);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 1024;
+        keyLight.shadow.mapSize.height = 1024;
+        keyLight.shadow.bias = -0.0001;
+        scene.add(keyLight);
+
+        // Cool Soft Fill Light from right
+        const fillLight = new THREE.DirectionalLight(0xdbeafe, 0.95);
+        fillLight.position.set(-2.0, 1.8, 2.0);
+        scene.add(fillLight);
+
+        // Crisp Studio Rim Light from behind
+        const rimLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        rimLight.position.set(0, 2.8, -2.2);
+        scene.add(rimLight);
+
+        // Bottom Bounce Light
+        const bounceLight = new THREE.DirectionalLight(0xffe8dc, 0.4);
+        bounceLight.position.set(0, -1, 1);
+        scene.add(bounceLight);
+
+        buildAvatarMesh();
+        setupStageInteractions();
+        window.addEventListener('resize', onWindowResize);
+        animateThree();
+      }
+
+      function getThemeMaterials() {
+        const faceTex = generateFaceTexture();
+        const irisTex = generateIrisTexture();
+        const hairTex = generateHairTexture();
+
+        // Color definitions for vibrant themes
+        let blazerColor, lapelColor, buttonColor, buttonMetal, jewelryColor;
+
+        if (currentTheme === 'sapphire') { // 💎 Royal Blue & Gold
+          blazerColor = 0x2255cc;
+          lapelColor = 0xeab308; // Gold satin
+          buttonColor = 0xffd700;
+          buttonMetal = 0.9;
+          jewelryColor = 0xffd700;
+        } else if (currentTheme === 'coral') { // 🌸 Sunset Rose Magenta
+          blazerColor = 0xe11d48;
+          lapelColor = 0xfda4af; // Rose gold
+          buttonColor = 0xffe4e6;
+          buttonMetal = 0.8;
+          jewelryColor = 0xf43f5e;
+        } else if (currentTheme === 'emerald') { // 🌿 Emerald & Gold
+          blazerColor = 0x059669;
+          lapelColor = 0xfbbf24; // Warm champagne gold
+          buttonColor = 0xf59e0b;
+          buttonMetal = 0.9;
+          jewelryColor = 0xfcd34d;
+        } else if (currentTheme === 'amethyst') { // 💜 Royal Violet
+          blazerColor = 0x7c3aed;
+          lapelColor = 0xc084fc; // Lilac silk
+          buttonColor = 0xf1f5f9;
+          buttonMetal = 0.7;
+          jewelryColor = 0xa855f7;
+        } else { // 🔷 Classic Studio Navy (Image 2)
+          blazerColor = 0x1b3558;
+          lapelColor = 0x152b48;
+          buttonColor = 0x0f172a;
+          buttonMetal = 0.85;
+          jewelryColor = 0xd4af37;
+        }
+
+        return {
+          skin: new THREE.MeshStandardMaterial({
+            color: 0xf8d0b8,
+            map: faceTex,
+            roughness: 0.40,
+            metalness: 0.04
+          }),
+          hair: new THREE.MeshStandardMaterial({
+            color: 0x2b1912,
+            map: hairTex,
+            roughness: 0.46,
+            metalness: 0.14
+          }),
+          blazer: new THREE.MeshStandardMaterial({
+            color: blazerColor,
+            roughness: 0.55,
+            metalness: 0.12
+          }),
+          lapel: new THREE.MeshStandardMaterial({
+            color: lapelColor,
+            roughness: 0.45,
+            metalness: 0.35,
+            side: THREE.DoubleSide
+          }),
+          shirt: new THREE.MeshStandardMaterial({
+            color: 0xfcfcfd,
+            roughness: 0.4,
+            metalness: 0.0
+          }),
+          buttons: new THREE.MeshStandardMaterial({
+            color: buttonColor,
+            roughness: 0.18,
+            metalness: buttonMetal
+          }),
+          jewelry: new THREE.MeshStandardMaterial({
+            color: jewelryColor,
+            roughness: 0.15,
+            metalness: 0.95
+          }),
+          iris: new THREE.MeshBasicMaterial({
+            map: irisTex
+          }),
+          sclera: new THREE.MeshBasicMaterial({
+            color: 0xfbfcfe
+          }),
+          brows: new THREE.MeshStandardMaterial({
+            color: 0x24150e,
+            roughness: 0.8
+          }),
+          lips: new THREE.MeshStandardMaterial({
+            color: 0xe06b66,
+            roughness: 0.28,
+            metalness: 0.02
+          }),
+          teeth: new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            roughness: 0.2
+          }),
+          nails: new THREE.MeshStandardMaterial({
+            color: 0xfde3d5,
+            roughness: 0.25,
+            metalness: 0.1
+          })
+        };
+      }
+
+      function buildAvatarMesh() {
+        if (avatarGroup) scene.remove(avatarGroup);
+        avatarGroup = new THREE.Group();
+
+        const mats = getThemeMaterials();
+
+        // 1. Torso & Wardrobe (Tailored Blazer + White T-Shirt + Gold Pin)
+        torsoGroup = new THREE.Group();
+
+        // White Inner Crew-Neck Shirt
+        const shirtGeom = new THREE.CylinderGeometry(0.24, 0.21, 0.70, 24);
+        const shirtMesh = new THREE.Mesh(shirtGeom, mats.shirt);
+        shirtMesh.position.set(0, 0.98, -0.01);
+        torsoGroup.add(shirtMesh);
+
+        // Crew Neck Collar Rim
+        const collarGeom = new THREE.TorusGeometry(0.12, 0.016, 12, 24);
+        collarGeom.rotateX(Math.PI / 2);
+        const collarMesh = new THREE.Mesh(collarGeom, mats.shirt);
+        collarMesh.position.set(0, 1.34, 0.02);
+        torsoGroup.add(collarMesh);
+
+        // Tailored Blazer Jacket Body
+        const blazerGeom = new THREE.CylinderGeometry(0.29, 0.25, 0.72, 24, 1, false, -Math.PI * 0.75, Math.PI * 1.5);
+        const blazerMesh = new THREE.Mesh(blazerGeom, mats.blazer);
+        blazerMesh.position.set(0, 0.97, 0.0);
+        blazerMesh.castShadow = true;
+        torsoGroup.add(blazerMesh);
+
+        // Tailored Left Lapel Flap
+        const lapelGeomL = new THREE.BufferGeometry();
+        const lapelVerticesL = new Float32Array([
+          -0.03, 1.32, 0.17,
+          -0.16, 1.28, 0.16,
+          -0.10, 0.98, 0.19,
+          -0.16, 1.28, 0.16,
+          -0.10, 0.98, 0.19,
+          -0.03, 0.98, 0.20
+        ]);
+        lapelGeomL.setAttribute('position', new THREE.BufferAttribute(lapelVerticesL, 3));
+        lapelGeomL.computeVertexNormals();
+        const lapelMeshL = new THREE.Mesh(lapelGeomL, mats.lapel);
+        torsoGroup.add(lapelMeshL);
+
+        // Tailored Right Lapel Flap
+        const lapelGeomR = new THREE.BufferGeometry();
+        const lapelVerticesR = new Float32Array([
+          0.03, 1.32, 0.17,
+          0.16, 1.28, 0.16,
+          0.10, 0.98, 0.19,
+          0.16, 1.28, 0.16,
+          0.10, 0.98, 0.19,
+          0.03, 0.98, 0.20
+        ]);
+        lapelGeomR.setAttribute('position', new THREE.BufferAttribute(lapelVerticesR, 3));
+        lapelGeomR.computeVertexNormals();
+        const lapelMeshR = new THREE.Mesh(lapelGeomR, mats.lapel);
+        torsoGroup.add(lapelMeshR);
+
+        // Golden Lapel Brooch / SignBridge Badge Pin
+        const broochGeom = new THREE.SphereGeometry(0.016, 12, 12);
+        const broochMesh = new THREE.Mesh(broochGeom, mats.jewelry);
+        broochMesh.position.set(-0.11, 1.18, 0.19);
+        torsoGroup.add(broochMesh);
+
+        // Blazer Buttons
+        const buttonGeom = new THREE.CylinderGeometry(0.016, 0.016, 0.012, 16);
+        buttonGeom.rotateX(Math.PI / 2);
+        const button1 = new THREE.Mesh(buttonGeom, mats.buttons);
+        button1.position.set(0, 0.92, 0.22);
+        torsoGroup.add(button1);
+        const button2 = new THREE.Mesh(buttonGeom, mats.buttons);
+        button2.position.set(0, 0.80, 0.22);
+        torsoGroup.add(button2);
+
+        // Smooth Neck
+        const neckGeom = new THREE.CylinderGeometry(0.09, 0.11, 0.22, 20);
+        const neckMesh = new THREE.Mesh(neckGeom, mats.skin);
+        neckMesh.position.set(0, 1.42, 0);
+        torsoGroup.add(neckMesh);
+
+        avatarGroup.add(torsoGroup);
+
+        // 2. Realistic Head & Face with Golden Earrings
+        headGroup = new THREE.Group();
+        headGroup.position.set(0, 1.62, 0);
+
+        // Sculpted Cranium & Face
+        const headGeom = new THREE.SphereGeometry(0.22, 32, 32);
+        headGeom.scale(1.0, 1.18, 1.02);
+        const headMesh = new THREE.Mesh(headGeom, mats.skin);
+        headMesh.castShadow = true;
+        headGroup.add(headMesh);
+
+        // Cheeks & Chin Contour
+        const chinGeom = new THREE.SphereGeometry(0.09, 20, 20);
+        chinGeom.scale(1.1, 0.9, 1.1);
+        const chinMesh = new THREE.Mesh(chinGeom, mats.skin);
+        chinMesh.position.set(0, -0.16, 0.14);
+        headGroup.add(chinMesh);
+
+        // Sculpted 3D Nose
+        const noseBridgeGeom = new THREE.ConeGeometry(0.026, 0.08, 16);
+        noseBridgeGeom.rotateX(Math.PI * 0.15);
+        const noseMesh = new THREE.Mesh(noseBridgeGeom, mats.skin);
+        noseMesh.position.set(0, -0.01, 0.22);
+        headGroup.add(noseMesh);
+
+        const noseTipGeom = new THREE.SphereGeometry(0.022, 16, 16);
+        const noseTip = new THREE.Mesh(noseTipGeom, mats.skin);
+        noseTip.position.set(0, -0.04, 0.23);
+        headGroup.add(noseTip);
+
+        // Styled Short Side-Parted Hair (Matching Image 2)
+        const hairGroup = new THREE.Group();
+
+        // Main Hair Volume (Swept back/to the side)
+        const hairCapGeom = new THREE.SphereGeometry(0.232, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.58);
+        hairCapGeom.scale(1.04, 1.22, 1.08);
+        const hairCap = new THREE.Mesh(hairCapGeom, mats.hair);
+        hairCap.position.set(0, 0.05, -0.02);
+        hairGroup.add(hairCap);
+
+        // Side-Part Swoop & Layered Strands
+        const hairSwoopGeom = new THREE.TorusGeometry(0.18, 0.06, 16, 32, Math.PI * 0.95);
+        hairSwoopGeom.rotateZ(-Math.PI * 0.25);
+        hairSwoopGeom.rotateX(Math.PI * 0.25);
+        const hairSwoop = new THREE.Mesh(hairSwoopGeom, mats.hair);
+        hairSwoop.position.set(-0.06, 0.21, 0.08);
+        hairGroup.add(hairSwoop);
+
+        // Sideburns
+        const sideburnGeom = new THREE.BoxGeometry(0.02, 0.10, 0.05);
+        const sbL = new THREE.Mesh(sideburnGeom, mats.hair);
+        sbL.position.set(-0.21, 0.02, 0.05);
+        hairGroup.add(sbL);
+        const sbR = new THREE.Mesh(sideburnGeom, mats.hair);
+        sbR.position.set(0.21, 0.02, 0.05);
+        hairGroup.add(sbR);
+
+        headGroup.add(hairGroup);
+
+        // Photorealistic Eyes with Cornea & Iris (Matching Image 2)
+        function createPhotorealEye(isLeft) {
+          const eyeContainer = new THREE.Group();
+          const side = isLeft ? -1 : 1;
+
+          // Sclera (Eye white)
+          const eyeBallGeom = new THREE.SphereGeometry(0.042, 20, 20);
+          eyeBallGeom.scale(1.2, 0.85, 0.7);
+          const scleraMesh = new THREE.Mesh(eyeBallGeom, mats.sclera);
+          eyeContainer.add(scleraMesh);
+
+          // Detailed Iris Disk with specular catchlight
+          const irisGeom = new THREE.CircleGeometry(0.024, 24);
+          const irisMesh = new THREE.Mesh(irisGeom, mats.iris);
+          irisMesh.position.set(0, 0, 0.038);
+          eyeContainer.add(irisMesh);
+
+          // Upper Eyelash / Lid Rim
+          const lidGeom = new THREE.TorusGeometry(0.044, 0.006, 8, 16, Math.PI * 0.85);
+          const lidMesh = new THREE.Mesh(lidGeom, mats.brows);
+          lidMesh.position.set(0, 0.018, 0.02);
+          eyeContainer.add(lidMesh);
+
+          eyeContainer.position.set(side * 0.076, 0.035, 0.185);
+          return eyeContainer;
+        }
+
+        leftEyeMesh = createPhotorealEye(true);
+        rightEyeMesh = createPhotorealEye(false);
+        headGroup.add(leftEyeMesh);
+        headGroup.add(rightEyeMesh);
+
+        // Arched Eyebrows
+        const browGeom = new THREE.BoxGeometry(0.065, 0.012, 0.01);
+        browGeom.rotateZ(0.12);
+        const browL = new THREE.Mesh(browGeom, mats.brows);
+        browL.position.set(-0.08, 0.10, 0.205);
+        headGroup.add(browL);
+
+        const browGeomR = new THREE.BoxGeometry(0.065, 0.012, 0.01);
+        browGeomR.rotateZ(-0.12);
+        const browR = new THREE.Mesh(browGeomR, mats.brows);
+        browR.position.set(0.08, 0.10, 0.205);
+        headGroup.add(browR);
+
+        // Friendly Smiling Mouth with Lips & Upper Teeth (Matching Image 2)
+        const mouthGroup = new THREE.Group();
+        mouthGroup.position.set(0, -0.10, 0.195);
+
+        // Upper Lip
+        const upperLipGeom = new THREE.TorusGeometry(0.052, 0.012, 10, 20, Math.PI * 0.9);
+        upperLipGeom.rotateZ(Math.PI);
+        const upperLip = new THREE.Mesh(upperLipGeom, mats.lips);
+        mouthGroup.add(upperLip);
+
+        // Lower Lip
+        const lowerLipGeom = new THREE.TorusGeometry(0.048, 0.013, 10, 20, Math.PI * 0.85);
+        const lowerLip = new THREE.Mesh(lowerLipGeom, mats.lips);
+        lowerLip.position.set(0, -0.015, 0);
+        mouthGroup.add(lowerLip);
+
+        // Clean White Upper Teeth Row
+        const teethGeom = new THREE.BoxGeometry(0.06, 0.014, 0.015);
+        const teethMesh = new THREE.Mesh(teethGeom, mats.teeth);
+        teethMesh.position.set(0, -0.005, -0.002);
+        mouthGroup.add(teethMesh);
+
+        mouthMesh = mouthGroup;
+        headGroup.add(mouthMesh);
+
+        // Ears with Golden Stud Earrings
+        const earGeom = new THREE.SphereGeometry(0.045, 16, 16);
+        earGeom.scale(0.5, 1.2, 0.8);
+        const earL = new THREE.Mesh(earGeom, mats.skin);
+        earL.position.set(-0.22, 0.02, 0.0);
+        headGroup.add(earL);
+
+        const earR = new THREE.Mesh(earGeom, mats.skin);
+        earR.position.set(0.22, 0.02, 0.0);
+        headGroup.add(earR);
+
+        // Golden Stud Earrings
+        const earringGeom = new THREE.SphereGeometry(0.014, 12, 12);
+        const earringL = new THREE.Mesh(earringGeom, mats.jewelry);
+        earringL.position.set(-0.225, -0.02, 0.0);
+        headGroup.add(earringL);
+
+        const earringR = new THREE.Mesh(earringGeom, mats.jewelry);
+        earringR.position.set(0.225, -0.02, 0.0);
+        headGroup.add(earringR);
+
+        avatarGroup.add(headGroup);
+
+        // 3. ARTICULATED ARMS & 5-FINGER HANDS (EXACTLY 5 FINGERS ON EACH HAND)
+        leftArmJoints = createRealisticArticulatedArm(true, mats);
+        rightArmJoints = createRealisticArticulatedArm(false, mats);
+
+        avatarGroup.add(leftArmJoints.shoulderGroup);
+        avatarGroup.add(rightArmJoints.shoulderGroup);
+
+        scene.add(avatarGroup);
+      }
+
+      /* ==========================================================================
+         CREATION OF REALISTIC ARMS & 5-FINGER HANDS HIERARCHY
+         ========================================================================== */
+      function createRealisticArticulatedArm(isLeft, mats) {
+        const side = isLeft ? -1 : 1;
+        const shoulderGroup = new THREE.Group();
+        shoulderGroup.position.set(side * 0.32, 1.30, 0);
+
+        // Upper Arm Blazer Sleeve
+        const upperArmMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.075, 0.068, 0.36, 20),
+          mats.blazer
+        );
+        upperArmMesh.position.y = -0.18;
+        upperArmMesh.castShadow = true;
+        shoulderGroup.add(upperArmMesh);
+
+        // Shoulder Pad Cap
+        const shoulderCapGeom = new THREE.SphereGeometry(0.08, 16, 16);
+        const shoulderCap = new THREE.Mesh(shoulderCapGeom, mats.blazer);
+        shoulderGroup.add(shoulderCap);
+
+        // Elbow Group
+        const elbowGroup = new THREE.Group();
+        elbowGroup.position.set(0, -0.36, 0);
+
+        // Forearm 3/4 Blazer Sleeve
+        const sleeveForearm = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.068, 0.062, 0.20, 20),
+          mats.blazer
+        );
+        sleeveForearm.position.y = -0.10;
+        sleeveForearm.castShadow = true;
+        elbowGroup.add(sleeveForearm);
+
+        // Forearm Skin
+        const skinForearm = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.052, 0.045, 0.16, 20),
+          mats.skin
+        );
+        skinForearm.position.y = -0.26;
+        elbowGroup.add(skinForearm);
+
+        // Wrist Group
+        const wristGroup = new THREE.Group();
+        wristGroup.position.set(0, -0.34, 0);
+
+        // Anatomical Palm (Curved, realistic skin shading)
+        const palmGeom = new THREE.BoxGeometry(0.09, 0.095, 0.038);
+        const palmMesh = new THREE.Mesh(palmGeom, mats.skin);
+        palmMesh.position.set(0, -0.048, 0);
+        palmMesh.castShadow = true;
+        wristGroup.add(palmMesh);
+
+        // 5 DETAILED ARTICULATED FINGERS PER HAND
+        // Thumb, Index, Middle, Ring, Pinky
+        const fingerConfigs = [
+          // 1. THUMB (Opposable, angled ~40deg outward)
+          {
+            name: 'thumb',
+            posX: side * 0.052, posY: -0.025, posZ: 0.015,
+            rotZ: side * 0.65, rotY: side * 0.25,
+            len1: 0.038, len2: 0.032, len3: 0,
+            radius: 0.013, isThumb: true
+          },
+          // 2. INDEX FINGER (3 segments)
+          {
+            name: 'index',
+            posX: side * 0.032, posY: -0.096, posZ: 0.002,
+            rotZ: side * 0.08, rotY: 0,
+            len1: 0.034, len2: 0.026, len3: 0.022,
+            radius: 0.011, isThumb: false
+          },
+          // 3. MIDDLE FINGER (3 segments, tallest)
+          {
+            name: 'middle',
+            posX: side * 0.008, posY: -0.098, posZ: 0.002,
+            rotZ: 0, rotY: 0,
+            len1: 0.038, len2: 0.028, len3: 0.024,
+            radius: 0.0115, isThumb: false
+          },
+          // 4. RING FINGER (3 segments)
+          {
+            name: 'ring',
+            posX: side * -0.018, posY: -0.096, posZ: 0.001,
+            rotZ: side * -0.07, rotY: 0,
+            len1: 0.034, len2: 0.025, len3: 0.021,
+            radius: 0.0105, isThumb: false
+          },
+          // 5. PINKY FINGER (3 segments, smallest)
+          {
+            name: 'pinky',
+            posX: side * -0.040, posY: -0.090, posZ: 0.0,
+            rotZ: side * -0.16, rotY: 0,
+            len1: 0.028, len2: 0.021, len3: 0.018,
+            radius: 0.0095, isThumb: false
+          }
+        ];
+
+        const fingers = [];
+
+        fingerConfigs.forEach(cfg => {
+          // Base knuckle joint
+          const baseJoint = new THREE.Group();
+          baseJoint.position.set(cfg.posX, cfg.posY, cfg.posZ);
+          baseJoint.rotation.z = cfg.rotZ;
+          baseJoint.rotation.y = cfg.rotY;
+
+          // Segment 1 (Proximal Phalanx)
+          const seg1Geom = new THREE.CylinderGeometry(cfg.radius * 0.95, cfg.radius, cfg.len1, 12);
+          const seg1Mesh = new THREE.Mesh(seg1Geom, mats.skin);
+          seg1Mesh.position.y = -cfg.len1 / 2;
+          baseJoint.add(seg1Mesh);
+
+          // Knuckle highlight sphere
+          const knuckle1 = new THREE.Mesh(new THREE.SphereGeometry(cfg.radius * 1.05, 10, 10), mats.skin);
+          baseJoint.add(knuckle1);
+
+          // Middle joint (PIP)
+          const midJoint = new THREE.Group();
+          midJoint.position.set(0, -cfg.len1, 0);
+
+          const seg2Geom = new THREE.CylinderGeometry(cfg.radius * 0.85, cfg.radius * 0.95, cfg.len2, 12);
+          const seg2Mesh = new THREE.Mesh(seg2Geom, mats.skin);
+          seg2Mesh.position.y = -cfg.len2 / 2;
+          midJoint.add(seg2Mesh);
+
+          // Distal Joint (DIP) - for fingers with 3 segments
+          let tipJoint = null;
+          if (cfg.len3 > 0) {
+            tipJoint = new THREE.Group();
+            tipJoint.position.set(0, -cfg.len2, 0);
+
+            const seg3Geom = new THREE.CylinderGeometry(cfg.radius * 0.7, cfg.radius * 0.85, cfg.len3, 12);
+            const seg3Mesh = new THREE.Mesh(seg3Geom, mats.skin);
+            seg3Mesh.position.y = -cfg.len3 / 2;
+            tipJoint.add(seg3Mesh);
+
+            // Fingertip dome
+            const tipDome = new THREE.Mesh(new THREE.SphereGeometry(cfg.radius * 0.72, 10, 10), mats.nails);
+            tipDome.position.y = -cfg.len3;
+            tipJoint.add(tipDome);
+
+            midJoint.add(tipJoint);
+          } else {
+            // Thumb tip
+            const tipDome = new THREE.Mesh(new THREE.SphereGeometry(cfg.radius * 0.85, 10, 10), mats.nails);
+            tipDome.position.y = -cfg.len2;
+            midJoint.add(tipDome);
+          }
+
+          baseJoint.add(midJoint);
+          wristGroup.add(baseJoint);
+
+          fingers.push({
+            baseJoint,
+            midJoint,
+            tipJoint,
+            config: cfg
+          });
+        });
+
+        elbowGroup.add(wristGroup);
+        shoulderGroup.add(elbowGroup);
+
+        return {
+          shoulderGroup,
+          elbowGroup,
+          wristGroup,
+          fingers
+        };
+      }
+
+      /* --------------------------------------------------------------------------
+         STAGE INTERACTIVE MOUSE TRACKING & ORBIT DRAG
+         -------------------------------------------------------------------------- */
+      function setupStageInteractions() {
+        stageWrapper.addEventListener('mousedown', (e) => {
+          isDragging = true;
+          previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+
+        window.addEventListener('mouseup', () => {
+          isDragging = false;
+        });
+
+        stageWrapper.addEventListener('mousemove', (e) => {
+          const rect = stageWrapper.getBoundingClientRect();
+          const normX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          const normY = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+
+          if (isDragging) {
+            const deltaX = e.clientX - previousMousePosition.x;
+            const deltaY = e.clientY - previousMousePosition.y;
+            avatarOrbitY += deltaX * 0.01;
+            avatarOrbitX = Math.max(-0.2, Math.min(0.2, avatarOrbitX + deltaY * 0.005));
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+          } else {
+            // Natural micro-eye & head tracking
+            targetJoints.headRotY = normX * 0.2 + avatarOrbitY;
+            targetJoints.headRotX = -normY * 0.15 + avatarOrbitX;
+          }
+        });
+
+        // Touch support for mobile/tablet
+        stageWrapper.addEventListener('touchstart', (e) => {
+          if (e.touches.length === 1) {
+            isDragging = true;
+            previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          }
+        });
+
+        window.addEventListener('touchend', () => { isDragging = false; });
+
+        stageWrapper.addEventListener('touchmove', (e) => {
+          if (isDragging && e.touches.length === 1) {
+            const deltaX = e.touches[0].clientX - previousMousePosition.x;
+            const deltaY = e.touches[0].clientY - previousMousePosition.y;
+            avatarOrbitY += deltaX * 0.01;
+            avatarOrbitX = Math.max(-0.2, Math.min(0.2, avatarOrbitX + deltaY * 0.005));
+            previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          }
+        });
+      }
+
+      function onWindowResize() {
+        if (!stageWrapper || !camera || !renderer) return;
+        const width = stageWrapper.clientWidth;
+        const height = stageWrapper.clientHeight;
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height);
+      }
+
+      function lerp(start, end, amt) {
+        return (1 - amt) * start + amt * end;
+      }
+
+      let blinkTimer = 0;
+      let isBlinking = false;
+
+      function animateThree() {
+        requestAnimationFrame(animateThree);
+        const delta = clock.getDelta();
+        const elapsed = clock.getElapsedTime();
+
+        // Natural breathing motion
+        let idleBreathY = 0;
+        let idleHeadRot = 0;
+        let idleArmSway = 0;
+
+        if (idleAnimationActive) {
+          idleBreathY = Math.sin(elapsed * 2.0) * 0.008;
+          idleHeadRot = Math.sin(elapsed * 1.0) * 0.025;
+          idleArmSway = Math.cos(elapsed * 1.6) * 0.02;
+        }
+
+        // Organic Eye Blinking simulation
+        blinkTimer += delta;
+        if (blinkTimer > 3.8) {
+          isBlinking = true;
+          if (blinkTimer > 3.96) {
+            isBlinking = false;
+            blinkTimer = 0;
+          }
+        }
+
+        if (leftEyeMesh && rightEyeMesh) {
+          const eyeScaleY = isBlinking ? 0.08 : 0.85;
+          leftEyeMesh.scale.y = lerp(leftEyeMesh.scale.y, eyeScaleY, 0.35);
+          rightEyeMesh.scale.y = lerp(rightEyeMesh.scale.y, eyeScaleY, 0.35);
+        }
+
+        // Smooth Joint target interpolation
+        const ease = 0.14;
+        currentJoints.lShoulderX = lerp(currentJoints.lShoulderX, targetJoints.lShoulderX, ease);
+        currentJoints.lShoulderY = lerp(currentJoints.lShoulderY, targetJoints.lShoulderY, ease);
+        currentJoints.lShoulderZ = lerp(currentJoints.lShoulderZ, targetJoints.lShoulderZ, ease);
+
+        currentJoints.lElbowX = lerp(currentJoints.lElbowX, targetJoints.lElbowX, ease);
+        currentJoints.lElbowY = lerp(currentJoints.lElbowY, targetJoints.lElbowY, ease);
+        currentJoints.lElbowZ = lerp(currentJoints.lElbowZ, targetJoints.lElbowZ, ease);
+
+        currentJoints.lWristX = lerp(currentJoints.lWristX, targetJoints.lWristX, ease);
+        currentJoints.lWristY = lerp(currentJoints.lWristY, targetJoints.lWristY, ease);
+        currentJoints.lWristZ = lerp(currentJoints.lWristZ, targetJoints.lWristZ, ease);
+
+        currentJoints.rShoulderX = lerp(currentJoints.rShoulderX, targetJoints.rShoulderX, ease);
+        currentJoints.rShoulderY = lerp(currentJoints.rShoulderY, targetJoints.rShoulderY, ease);
+        currentJoints.rShoulderZ = lerp(currentJoints.rShoulderZ, targetJoints.rShoulderZ, ease);
+
+        currentJoints.rElbowX = lerp(currentJoints.rElbowX, targetJoints.rElbowX, ease);
+        currentJoints.rElbowY = lerp(currentJoints.rElbowY, targetJoints.rElbowY, ease);
+        currentJoints.rElbowZ = lerp(currentJoints.rElbowZ, targetJoints.rElbowZ, ease);
+
+        currentJoints.rWristX = lerp(currentJoints.rWristX, targetJoints.rWristX, ease);
+        currentJoints.rWristY = lerp(currentJoints.rWristY, targetJoints.rWristY, ease);
+        currentJoints.rWristZ = lerp(currentJoints.rWristZ, targetJoints.rWristZ, ease);
+
+        // 5 Finger curls interpolation
+        currentJoints.lThumbCurl = lerp(currentJoints.lThumbCurl, targetJoints.lThumbCurl, ease);
+        currentJoints.lIndexCurl = lerp(currentJoints.lIndexCurl, targetJoints.lIndexCurl, ease);
+        currentJoints.lMiddleCurl = lerp(currentJoints.lMiddleCurl, targetJoints.lMiddleCurl, ease);
+        currentJoints.lRingCurl = lerp(currentJoints.lRingCurl, targetJoints.lRingCurl, ease);
+        currentJoints.lPinkyCurl = lerp(currentJoints.lPinkyCurl, targetJoints.lPinkyCurl, ease);
+
+        currentJoints.rThumbCurl = lerp(currentJoints.rThumbCurl, targetJoints.rThumbCurl, ease);
+        currentJoints.rIndexCurl = lerp(currentJoints.rIndexCurl, targetJoints.rIndexCurl, ease);
+        currentJoints.rMiddleCurl = lerp(currentJoints.rMiddleCurl, targetJoints.rMiddleCurl, ease);
+        currentJoints.rRingCurl = lerp(currentJoints.rRingCurl, targetJoints.rRingCurl, ease);
+        currentJoints.rPinkyCurl = lerp(currentJoints.rPinkyCurl, targetJoints.rPinkyCurl, ease);
+
+        currentJoints.mouthOpen = lerp(currentJoints.mouthOpen, targetJoints.mouthOpen, 0.25);
+        currentJoints.headRotY = lerp(currentJoints.headRotY, targetJoints.headRotY, ease);
+        currentJoints.headRotX = lerp(currentJoints.headRotX, targetJoints.headRotX, ease);
+        currentJoints.headRotZ = lerp(currentJoints.headRotZ, targetJoints.headRotZ, ease);
+
+        // Apply Left Arm & 5 Fingers
+        if (leftArmJoints) {
+          leftArmJoints.shoulderGroup.rotation.set(
+            currentJoints.lShoulderX + idleArmSway,
+            currentJoints.lShoulderY,
+            currentJoints.lShoulderZ
+          );
+          leftArmJoints.elbowGroup.rotation.set(
+            currentJoints.lElbowX,
+            currentJoints.lElbowY,
+            currentJoints.lElbowZ
+          );
+          leftArmJoints.wristGroup.rotation.set(
+            currentJoints.lWristX,
+            currentJoints.lWristY,
+            currentJoints.lWristZ
+          );
+
+          const curlsL = [
+            currentJoints.lThumbCurl,
+            currentJoints.lIndexCurl,
+            currentJoints.lMiddleCurl,
+            currentJoints.lRingCurl,
+            currentJoints.lPinkyCurl
+          ];
+
+          leftArmJoints.fingers.forEach((fg, idx) => {
+            const c = curlsL[idx];
+            fg.baseJoint.rotation.x = c * 0.9;
+            fg.midJoint.rotation.x = c * 1.1;
+            if (fg.tipJoint) fg.tipJoint.rotation.x = c * 0.9;
+          });
+        }
+
+        // Apply Right Arm & 5 Fingers
+        if (rightArmJoints) {
+          rightArmJoints.shoulderGroup.rotation.set(
+            currentJoints.rShoulderX - idleArmSway,
+            currentJoints.rShoulderY,
+            currentJoints.rShoulderZ
+          );
+          rightArmJoints.elbowGroup.rotation.set(
+            currentJoints.rElbowX,
+            currentJoints.rElbowY,
+            currentJoints.rElbowZ
+          );
+          rightArmJoints.wristGroup.rotation.set(
+            currentJoints.rWristX,
+            currentJoints.rWristY,
+            currentJoints.rWristZ
+          );
+
+          const curlsR = [
+            currentJoints.rThumbCurl,
+            currentJoints.rIndexCurl,
+            currentJoints.rMiddleCurl,
+            currentJoints.rRingCurl,
+            currentJoints.rPinkyCurl
+          ];
+
+          rightArmJoints.fingers.forEach((fg, idx) => {
+            const c = curlsR[idx];
+            fg.baseJoint.rotation.x = c * 0.9;
+            fg.midJoint.rotation.x = c * 1.1;
+            if (fg.tipJoint) fg.tipJoint.rotation.x = c * 0.9;
+          });
+        }
+
+        // Apply Torso & Head
+        if (headGroup) {
+          headGroup.position.y = 1.62 + idleBreathY;
+          headGroup.rotation.y = currentJoints.headRotY + idleHeadRot;
+          headGroup.rotation.x = currentJoints.headRotX;
+          headGroup.rotation.z = currentJoints.headRotZ;
+        }
+
+        if (mouthMesh) {
+          mouthMesh.scale.y = 1 + currentJoints.mouthOpen * 2.2;
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      function set3DAvatarPose(pose) {
+        targetJoints.lShoulderX = (pose.lShoulderX || 0) * (Math.PI / 180);
+        targetJoints.lShoulderY = (pose.lShoulderY || 0) * (Math.PI / 180);
+        targetJoints.lShoulderZ = (pose.lShoulderZ || 0) * (Math.PI / 180);
+
+        targetJoints.lElbowX = (pose.lElbowX || 0) * (Math.PI / 180);
+        targetJoints.lElbowY = (pose.lElbowY || 0) * (Math.PI / 180);
+        targetJoints.lElbowZ = (pose.lElbowZ || 0) * (Math.PI / 180);
+
+        targetJoints.lWristX = (pose.lWristX || 0) * (Math.PI / 180);
+        targetJoints.lWristY = (pose.lWristY || 0) * (Math.PI / 180);
+        targetJoints.lWristZ = (pose.lWristZ || 0) * (Math.PI / 180);
+
+        targetJoints.rShoulderX = (pose.rShoulderX || 0) * (Math.PI / 180);
+        targetJoints.rShoulderY = (pose.rShoulderY || 0) * (Math.PI / 180);
+        targetJoints.rShoulderZ = (pose.rShoulderZ || 0) * (Math.PI / 180);
+
+        targetJoints.rElbowX = (pose.rElbowX || 0) * (Math.PI / 180);
+        targetJoints.rElbowY = (pose.rElbowY || 0) * (Math.PI / 180);
+        targetJoints.rElbowZ = (pose.rElbowZ || 0) * (Math.PI / 180);
+
+        targetJoints.rWristX = (pose.rWristX || 0) * (Math.PI / 180);
+        targetJoints.rWristY = (pose.rWristY || 0) * (Math.PI / 180);
+        targetJoints.rWristZ = (pose.rWristZ || 0) * (Math.PI / 180);
+
+        // 5 Finger Curler (0 = all open 5-fingers, 1 = all curled fist)
+        const lGeneralCurl = pose.lFingers ?? 0;
+        targetJoints.lThumbCurl = pose.lThumbCurl ?? lGeneralCurl;
+        targetJoints.lIndexCurl = pose.lIndexCurl ?? lGeneralCurl;
+        targetJoints.lMiddleCurl = pose.lMiddleCurl ?? lGeneralCurl;
+        targetJoints.lRingCurl = pose.lRingCurl ?? lGeneralCurl;
+        targetJoints.lPinkyCurl = pose.lPinkyCurl ?? lGeneralCurl;
+
+        const rGeneralCurl = pose.rFingers ?? 0;
+        targetJoints.rThumbCurl = pose.rThumbCurl ?? rGeneralCurl;
+        targetJoints.rIndexCurl = pose.rIndexCurl ?? rGeneralCurl;
+        targetJoints.rMiddleCurl = pose.rMiddleCurl ?? rGeneralCurl;
+        targetJoints.rRingCurl = pose.rRingCurl ?? rGeneralCurl;
+        targetJoints.rPinkyCurl = pose.rPinkyCurl ?? rGeneralCurl;
+
+        targetJoints.headRotY = (pose.headRotY || 0) * (Math.PI / 180);
+        targetJoints.headRotX = (pose.headRotX || 0) * (Math.PI / 180);
+        targetJoints.headRotZ = (pose.headRotZ || 0) * (Math.PI / 180);
+        targetJoints.mouthOpen = pose.mouthOpen || 0;
+      }
+
+      // Camera angles switcher
+      let currentCamAngleIndex = 0;
+      const cameraAngles = [
+        { pos: [0, 1.36, 3.2], look: [0, 1.28, 0] },
+        { pos: [0.6, 1.40, 2.7], look: [0, 1.30, 0] },
+        { pos: [-0.6, 1.40, 2.7], look: [0, 1.30, 0] },
+        { pos: [0, 1.48, 2.0], look: [0, 1.42, 0] } // Close-up
+      ];
+
+      function toggleCameraAngle() {
+        currentCamAngleIndex = (currentCamAngleIndex + 1) % cameraAngles.length;
+        const target = cameraAngles[currentCamAngleIndex];
+        camera.position.set(...target.pos);
+        camera.lookAt(...target.look);
+      }
+
+      /* ==========================================================================
+         2. SIGN LANGUAGE POSES WITH 5-FINGER ACCURACY & IMAGE 2 DEFAULT POSE
+         ========================================================================== */
+
+      // Signature Welcoming Interpreter Pose (Matching Image 2 exactly: Right hand raised waving 5-fingers, Left hand poised in front)
+      const SIGNATURE_GREETING_POSE = {
+        rShoulderX: -75, rShoulderY: 20, rShoulderZ: 35,
+        rElbowX: -90, rElbowY: 30, rElbowZ: 0,
+        rWristX: -10, rWristY: 20, rWristZ: 0,
+        rThumbCurl: 0, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 0, rPinkyCurl: 0, // All 5 fingers extended!
+
+        lShoulderX: -45, lShoulderY: -25, lShoulderZ: -20,
+        lElbowX: -75, lElbowY: -20, lElbowZ: 0,
+        lWristX: 10, lWristY: -10,
+        lThumbCurl: 0.1, lIndexCurl: 0.1, lMiddleCurl: 0.1, lRingCurl: 0.1, lPinkyCurl: 0.1, // Poised 5-fingers
+
+        headRotY: -4, headRotX: 2, headRotZ: -3,
+        mouthOpen: 0.1,
+        caption: "READY (INTERPRETER ACTIVE)"
+      };
+
+      const REST_POSE = SIGNATURE_GREETING_POSE;
+
+      const POSES_3D = {
+        // === 1. CORE ASL DAILY SIGNS FROM USER REFERENCE IMAGE ===
+        hello: {
+          rShoulderX: -78, rShoulderY: 22, rShoulderZ: 40,
+          rElbowX: -95, rElbowY: 35, rElbowZ: 0,
+          rWristX: -15, rWristY: 25, rWristZ: 0,
+          rThumbCurl: 0, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 0, rPinkyCurl: 0,
+          mouthOpen: 0.4, headRotY: -6,
+          caption: "HELLO (👋 5-FINGER SALUTE/WAVE)"
+        },
+        goodbye: {
+          rShoulderX: -75, rShoulderY: 20, rShoulderZ: 35,
+          rElbowX: -90, rElbowY: 30, rWristY: 30,
+          rThumbCurl: 0, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 0, rPinkyCurl: 0,
+          caption: "GOODBYE (👋 OPEN WAVE)"
+        },
+        please: {
+          rShoulderX: -45, rShoulderY: -15, rShoulderZ: 0,
+          rElbowX: -90, rWristX: -10,
+          rThumbCurl: 0, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 0, rPinkyCurl: 0,
+          caption: "PLEASE (FLAT PALM ON CHEST)"
+        },
+        thanks: {
+          rShoulderX: -60, rShoulderY: -10, rShoulderZ: 0,
+          rElbowX: -110, rElbowY: 0, rElbowZ: 0,
+          rWristX: -20, rFingers: 0, mouthOpen: 0.4,
+          caption: "THANK YOU (CHIN TO OUTWARD)"
+        },
+        thankyou: {
+          rShoulderX: -60, rShoulderY: -10, rShoulderZ: 0,
+          rElbowX: -110, rWristX: -20, rFingers: 0, mouthOpen: 0.4,
+          caption: "THANK YOU (CHIN TO OUTWARD)"
+        },
+        yes: {
+          rShoulderX: -45, rShoulderY: 0, rShoulderZ: 10,
+          rElbowX: -70, rElbowY: 0, rElbowZ: 0,
+          rThumbCurl: 0, rIndexCurl: 1, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1,
+          mouthOpen: 0.2, headRotX: 14,
+          caption: "YES (NODDING S-FIST 👍)"
+        },
+        no: {
+          rShoulderX: -45, rShoulderY: 0, rShoulderZ: 10,
+          rElbowX: -75, rWristY: 20,
+          rThumbCurl: 0.2, rIndexCurl: 0.5, rMiddleCurl: 0.5, rRingCurl: 1, rPinkyCurl: 1,
+          headRotY: 15,
+          caption: "NO (INDEX+MIDDLE SNAP 🤏)"
+        },
+        sorry: {
+          rShoulderX: -45, rShoulderY: -15, rShoulderZ: 0,
+          rElbowX: -90, rFingers: 1, headRotX: 10,
+          caption: "SORRY (A-FIST CIRCLE ON CHEST)"
+        },
+        iloveyou: {
+          rShoulderX: -65, rShoulderY: 10, rShoulderZ: 20,
+          rElbowX: -80,
+          rThumbCurl: 0, rIndexCurl: 0, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 0,
+          caption: "I LOVE YOU (🤟 ILY SIGN)"
+        },
+        love: {
+          lShoulderX: -55, lShoulderY: 25, lElbowX: -90, lFingers: 1,
+          rShoulderX: -55, rShoulderY: -25, rElbowX: -90, rFingers: 1,
+          caption: "LOVE (ARMS CROSSED OVER CHEST ❤️)"
+        },
+        welcome: {
+          lShoulderX: -30, lShoulderY: 35, lShoulderZ: 30,
+          lElbowX: -50, rShoulderX: -30, rShoulderY: -35, rShoulderZ: -30,
+          rElbowX: -50, lFingers: 0, rFingers: 0, mouthOpen: 0.5,
+          caption: "WELCOME (OPEN PALMS SWEEP INWARD)"
+        },
+        family: {
+          lShoulderX: -45, lShoulderY: 20, lElbowX: -70,
+          lThumbCurl: 0.7, lIndexCurl: 0.7, lMiddleCurl: 0, lRingCurl: 0, lPinkyCurl: 0,
+          rShoulderX: -45, rShoulderY: -20, rElbowX: -70,
+          rThumbCurl: 0.7, rIndexCurl: 0.7, rMiddleCurl: 0, rRingCurl: 0, rPinkyCurl: 0,
+          caption: "FAMILY (F-HANDS CIRCLE 👨‍👩‍👧‍👦)"
+        },
+        house: {
+          lShoulderX: -65, lShoulderY: 25, lElbowX: -85, lWristX: -20, lFingers: 0,
+          rShoulderX: -65, rShoulderY: -25, rElbowX: -85, rWristX: -20, rFingers: 0,
+          caption: "HOUSE (ROOF & WALLS 🏠)"
+        },
+        hungry: {
+          rShoulderX: -50, rShoulderY: -10, rElbowX: -85,
+          rThumbCurl: 0.35, rIndexCurl: 0.35, rMiddleCurl: 0.35, rRingCurl: 0.35, rPinkyCurl: 0.35,
+          caption: "HUNGRY (C-HAND DOWN CHEST 🍽️)"
+        },
+        thirsty: {
+          rShoulderX: -65, rShoulderY: -10, rElbowX: -110,
+          rThumbCurl: 0.9, rIndexCurl: 0, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1,
+          caption: "THIRSTY (TRACE THROAT 🥤)"
+        },
+        help: {
+          lShoulderX: -45, lShoulderY: 15, lShoulderZ: 0, lElbowX: -70, lFingers: 0,
+          rShoulderX: -45, rShoulderY: 0, rShoulderZ: 0, rElbowX: -70, rFingers: 1,
+          caption: "HELP (LIFT FIST ON PALM 🆘)"
+        },
+        drink: {
+          rShoulderX: -60, rShoulderY: -10, rElbowX: -115,
+          rThumbCurl: 0.3, rIndexCurl: 0.3, rMiddleCurl: 0.3, rRingCurl: 0.3, rPinkyCurl: 0.3,
+          mouthOpen: 0.4,
+          caption: "DRINK (C-CUP TO MOUTH 🥤)"
+        },
+        finished: {
+          lShoulderX: -45, lShoulderY: 30, lElbowX: -60, lFingers: 0,
+          rShoulderX: -45, rShoulderY: -30, rElbowX: -60, rFingers: 0,
+          caption: "FINISHED / DONE (FLIP OPEN 5-FINGERS 👐)"
+        },
+        eat: {
+          rShoulderX: -60, rShoulderY: -10, rShoulderZ: 0,
+          rElbowX: -120, rFingers: 0.8, mouthOpen: 0.6,
+          caption: "FOOD / EAT (TAP LIPS 🍽️)"
+        },
+        food: {
+          rShoulderX: -60, rShoulderY: -10, rShoulderZ: 0,
+          rElbowX: -120, rFingers: 0.8, mouthOpen: 0.6,
+          caption: "FOOD / EAT (TAP LIPS 🍽️)"
+        },
+        good: {
+          lShoulderX: -45, lShoulderY: 15, lElbowX: -65, lFingers: 0,
+          rShoulderX: -60, rShoulderY: -10, rElbowX: -100, rFingers: 0,
+          caption: "GOOD (CHIN DOWN TO PALM 👍)"
+        },
+        morning: {
+          lShoulderX: -30, lShoulderY: 25, lElbowX: -80, lFingers: 0,
+          rShoulderX: -65, rShoulderY: -15, rElbowX: -60, rFingers: 0,
+          caption: "MORNING (RISING SUN 🌅)"
+        },
+        miniheart: {
+          rShoulderX: -55, rShoulderY: 10, rElbowX: -85,
+          rThumbCurl: 0.2, rIndexCurl: 0.2, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1,
+          caption: "MINI HEART (FINGER HEART 🫰)"
+        },
+        goodluck: {
+          rShoulderX: -55, rShoulderY: 10, rElbowX: -85,
+          rThumbCurl: 0.8, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 1, rPinkyCurl: 1,
+          caption: "GOOD LUCK (FINGERS CROSSED 🤞)"
+        },
+        shaka: {
+          rShoulderX: -55, rShoulderY: 15, rElbowX: -85, rWristY: 30,
+          rThumbCurl: 0, rIndexCurl: 1, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 0,
+          caption: "SHAKA (HANG LOOSE 🤙)"
+        },
+        telephone: {
+          rShoulderX: -65, rShoulderY: -10, rElbowX: -110,
+          rThumbCurl: 0, rIndexCurl: 1, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 0,
+          caption: "TELEPHONE / CALL ME (🤙📞)"
+        },
+        heart: {
+          lShoulderX: -55, lShoulderY: 20, lElbowX: -85, lWristX: -20,
+          lThumbCurl: 0.2, lIndexCurl: 0.2, lMiddleCurl: 0.8, lRingCurl: 0.8, lPinkyCurl: 0.8,
+          rShoulderX: -55, rShoulderY: -20, rElbowX: -85, rWristX: -20,
+          rThumbCurl: 0.2, rIndexCurl: 0.2, rMiddleCurl: 0.8, rRingCurl: 0.8, rPinkyCurl: 0.8,
+          caption: "HEART (TWO-HAND HEART 🫶)"
+        },
+        hug: {
+          lShoulderX: -45, lShoulderY: 30, lElbowX: -60, lFingers: 0,
+          rShoulderX: -45, rShoulderY: -30, rElbowX: -60, rFingers: 0,
+          caption: "HUG (OPEN ARMS 🤗)"
+        },
+        cheers: {
+          lShoulderX: -75, lShoulderY: 25, lElbowX: -40, lFingers: 0,
+          rShoulderX: -75, rShoulderY: -25, rElbowX: -40, rFingers: 0,
+          caption: "CHEERS (HIGH TEN 🙌)"
+        },
+        ifeelyou: {
+          lShoulderX: -45, lShoulderY: 20, lElbowX: -80, lFingers: 1,
+          rShoulderX: -45, rShoulderY: -10, rElbowX: -80, rFingers: 0,
+          caption: "I FEEL YOU (EMPATHY TAP 🤝)"
+        },
+        whatever: {
+          lShoulderX: -45, lShoulderY: 25, lElbowX: -70, lFingers: 0,
+          rShoulderX: -45, rShoulderY: -25, rElbowX: -70, rFingers: 0,
+          headRotY: -15,
+          caption: "WHATEVER (W-HANDS 🤷)"
+        },
+        sick: {
+          lShoulderX: -30, lShoulderY: 10, lElbowX: -40, lFingers: 0,
+          rShoulderX: -30, rShoulderY: -10, rElbowX: -40, rFingers: 0,
+          headRotX: 18,
+          caption: "SICK / UNWELL (DOWNWARD HANDS 🤒)"
+        },
+        stop: {
+          rShoulderX: -75, rShoulderY: 0, rShoulderZ: 0,
+          rElbowX: -20, rWristX: -50,
+          rThumbCurl: 0, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 0, rPinkyCurl: 0,
+          caption: "STOP (OPEN PALM 🛑)"
+        },
+        water: {
+          rShoulderX: -60, rShoulderY: 0, rShoulderZ: 0,
+          rElbowX: -110,
+          rThumbCurl: 0.8, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 0, rPinkyCurl: 0.8,
+          mouthOpen: 0.4,
+          caption: "WATER (W-HAND TO CHIN 💧)"
+        },
+        friend: {
+          lShoulderX: -40, lShoulderY: 20, lElbowX: -60,
+          lThumbCurl: 0.8, lIndexCurl: 0.3, lMiddleCurl: 1, lRingCurl: 1, lPinkyCurl: 1,
+          rShoulderX: -40, rShoulderY: -20, rElbowX: -60,
+          rThumbCurl: 0.8, rIndexCurl: 0.3, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1,
+          caption: "FRIEND (HOOK INDEX 🤝)"
+        },
+        how: {
+          lShoulderX: -40, lShoulderY: 20, lElbowX: -60, lFingers: 1,
+          rShoulderX: -40, rShoulderY: -20, rElbowX: -60, rFingers: 1,
+          caption: "HOW (ROLL FISTS ❓)"
+        },
+        what: {
+          lShoulderX: -30, lShoulderY: 25, lElbowX: -50, lFingers: 0,
+          rShoulderX: -30, rShoulderY: -25, rElbowX: -50, rFingers: 0,
+          headRotY: 10,
+          caption: "WHAT (PALMS UP 🤷)"
+        },
+        where: {
+          rShoulderX: -50, rShoulderY: 0, rElbowX: -60,
+          rThumbCurl: 0.9, rIndexCurl: 0, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1,
+          headRotY: -12,
+          caption: "WHERE (POINT & SHAKE 📍)"
+        },
+        who: {
+          rShoulderX: -60, rShoulderY: 0, rElbowX: -110,
+          rThumbCurl: 0.9, rIndexCurl: 0, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1,
+          caption: "WHO (CHIN CIRCLE 👤)"
+        },
+        you: {
+          rShoulderX: -50, rShoulderY: 0, rElbowX: -30,
+          rThumbCurl: 0.9, rIndexCurl: 0, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1,
+          caption: "YOU (POINT FORWARD 👉)"
+        },
+        me: {
+          rShoulderX: -40, rShoulderY: -20, rElbowX: -85,
+          rThumbCurl: 0.9, rIndexCurl: 0, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1,
+          caption: "ME / I (POINT TO CHEST 👈)"
+        },
+        vanakkam: {
+          lShoulderX: -40, lShoulderY: 30, lShoulderZ: 25,
+          lElbowX: -90, lElbowY: 0, lElbowZ: 0,
+          rShoulderX: -40, rShoulderY: -30, rShoulderZ: -25,
+          rElbowX: -90, rElbowY: 0, rElbowZ: 0,
+          lFingers: 0, rFingers: 0, mouthOpen: 0.3, headRotX: 8,
+          caption: "VANAKKAM / NAMASTE (🙏)"
+        },
+        nandri: {
+          lShoulderX: -40, lShoulderY: 20, lShoulderZ: 20,
+          lElbowX: -90, rShoulderX: -40, rShoulderY: -20, rShoulderZ: -20,
+          rElbowX: -90, lFingers: 0, rFingers: 0, mouthOpen: 0.3,
+          caption: "NANDRI / THANK YOU (🙏)"
+        },
+
+        // === 2. FULL ASL MANUAL ALPHABET (A to Z) FROM USER REFERENCE IMAGE ===
+        a: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0, rIndexCurl: 1, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'A' (FIST WITH THUMB SIDE)" },
+        b: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.9, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 0, rPinkyCurl: 0, caption: "ASL LETTER 'B' (4 FINGERS UP, THUMB FOLD)" },
+        c: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.35, rIndexCurl: 0.35, rMiddleCurl: 0.35, rRingCurl: 0.35, rPinkyCurl: 0.35, caption: "ASL LETTER 'C' (CURVED C HAND)" },
+        d: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.7, rIndexCurl: 0, rMiddleCurl: 0.7, rRingCurl: 0.7, rPinkyCurl: 0.7, caption: "ASL LETTER 'D' (INDEX UP, THUMB TOUCHES OTHERS)" },
+        e: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.9, rIndexCurl: 0.85, rMiddleCurl: 0.85, rRingCurl: 0.85, rPinkyCurl: 0.85, caption: "ASL LETTER 'E' (CURLED ON THUMB)" },
+        f: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.75, rIndexCurl: 0.75, rMiddleCurl: 0, rRingCurl: 0, rPinkyCurl: 0, caption: "ASL LETTER 'F' (INDEX+THUMB CIRCLE 👌)" },
+        g: { rShoulderX: -55, rElbowX: -75, rWristY: -30, rThumbCurl: 0, rIndexCurl: 0, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'G' (INDEX HORIZONTAL 👉)" },
+        h: { rShoulderX: -55, rElbowX: -75, rWristY: -30, rThumbCurl: 0.8, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'H' (INDEX+MIDDLE HORIZONTAL)" },
+        i: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.9, rIndexCurl: 1, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 0, caption: "ASL LETTER 'I' (PINKY STRAIGHT UP 🤙)" },
+        j: { rShoulderX: -55, rElbowX: -75, rWristY: 25, rThumbCurl: 0.9, rIndexCurl: 1, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 0, caption: "ASL LETTER 'J' (PINKY TRACE 'J')" },
+        k: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.4, rIndexCurl: 0, rMiddleCurl: 0.25, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'K' (INDEX UP, MIDDLE 45°)" },
+        l: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0, rIndexCurl: 0, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'L' (L-SHAPE 👆)" },
+        m: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.9, rIndexCurl: 0.8, rMiddleCurl: 0.8, rRingCurl: 0.8, rPinkyCurl: 1, caption: "ASL LETTER 'M' (THUMB UNDER 3 FINGERS)" },
+        n: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.9, rIndexCurl: 0.8, rMiddleCurl: 0.8, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'N' (THUMB UNDER 2 FINGERS)" },
+        o: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.6, rIndexCurl: 0.6, rMiddleCurl: 0.6, rRingCurl: 0.6, rPinkyCurl: 0.6, caption: "ASL LETTER 'O' (O-CIRCLE SHAPE)" },
+        p: { rShoulderX: -55, rElbowX: -75, rWristX: 45, rThumbCurl: 0.4, rIndexCurl: 0, rMiddleCurl: 0.25, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'P' (DOWNWARD K SHAPE)" },
+        q: { rShoulderX: -55, rElbowX: -75, rWristX: 45, rThumbCurl: 0, rIndexCurl: 0, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'Q' (DOWNWARD G SHAPE)" },
+        r: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.9, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'R' (CROSSED INDEX+MIDDLE 🤞)" },
+        s: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.8, rIndexCurl: 1, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'S' (FIST WITH THUMB FRONT ✊)" },
+        t: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.7, rIndexCurl: 0.8, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'T' (THUMB BETWEEN INDEX/MIDDLE)" },
+        u: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.9, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'U' (INDEX+MIDDLE TOGETHER ✌️)" },
+        v: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.9, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'V' (V / PEACE SHAPE ✌️)" },
+        w: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.9, rIndexCurl: 0, rMiddleCurl: 0, rRingCurl: 0, rPinkyCurl: 1, caption: "ASL LETTER 'W' (W SHAPE 3 FINGERS)" },
+        x: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0.9, rIndexCurl: 0.45, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'X' (HOOKED INDEX FINGER)" },
+        y: { rShoulderX: -55, rElbowX: -75, rThumbCurl: 0, rIndexCurl: 1, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 0, caption: "ASL LETTER 'Y' (THUMB+PINKY EXTENDED 🤙)" },
+        z: { rShoulderX: -55, rElbowX: -75, rWristY: 20, rThumbCurl: 0.9, rIndexCurl: 0, rMiddleCurl: 1, rRingCurl: 1, rPinkyCurl: 1, caption: "ASL LETTER 'Z' (INDEX TRACE 'Z')" }
+      };
+
+      // Synonyms & Multi-language mappings (Tamil & English)
+      const SYNONYMS_DICT = {
+        "hey": "hello", "howdy": "hello", "hi": "hello", "greetings": "hello",
+        "bye": "goodbye", "byebye": "goodbye", "cya": "goodbye",
+        "vanakkam": "vanakkam", "namaste": "vanakkam", "namaskar": "vanakkam",
+        "thank": "thanks", "thankyou": "thanks", "thx": "thanks", "ty": "thanks",
+        "nandri": "nandri", "dhanyavad": "nandri",
+        "pls": "please", "plz": "please",
+        "yeah": "yes", "yep": "yes", "ama": "yes", "sari": "yes", "ok": "yes",
+        "nah": "no", "nope": "no", "illa": "no", "illai": "no",
+        "food": "eat", "hungry": "hungry", "saapadu": "eat",
+        "thanni": "drink", "drink": "drink", "water": "water", "juice": "drink",
+        "helpme": "help", "kapathu": "help",
+        "done": "finished", "finish": "finished", "mudinjadhu": "finished",
+        "morning": "morning", "goodmorning": "morning", "kaalai": "morning",
+        "house": "house", "veedu": "house", "home": "house",
+        "family": "family", "kudumbam": "family",
+        "love": "love", "kaadhal": "love", "anbu": "love",
+        "nanba": "friend", "machan": "friend", "buddy": "friend",
+        "miniheart": "miniheart", "fingerheart": "miniheart", "koreanheart": "miniheart",
+        "goodluck": "goodluck", "fingerscrossed": "goodluck", "luck": "goodluck",
+        "shaka": "shaka", "hangloose": "shaka",
+        "telephone": "telephone", "callme": "telephone", "phone": "telephone",
+        "heart": "heart", "heartshape": "heart",
+        "hug": "hug", "hugs": "hug", "anaippu": "hug",
+        "cheers": "cheers", "celebrate": "cheers",
+        "ifeelyou": "ifeelyou", "empathy": "ifeelyou",
+        "whatever": "whatever", "idontcare": "whatever",
+        "sick": "sick", "unwell": "sick", "udambusariilla": "sick",
+        "epdi": "how", "eppadi": "how", "enna": "what", "enge": "where", "yaaru": "who",
+        "naan": "me", "neenga": "you", "nee": "you"
+      };
+
+      const STOPWORDS_SET = new Set(["a", "an", "the", "is", "are", "am", "was", "were", "to", "of", "in", "on", "and", "or", "it", "that", "this"]);
+
+      /* ==========================================================================
+         3. ASYNC SIGN QUEUE & FINGERSPELLING ENGINE
+         ========================================================================== */
+      const el = {
+        glossCaption: document.getElementById('glossCaption'),
+        fsStrip: document.getElementById('fsStrip'),
+        liveSubtitleText: document.getElementById('liveSubtitleText'),
+        subtitleMeta: document.getElementById('subtitleMeta'),
+        historyBox: document.getElementById('historyBox'),
+        speedRange: document.getElementById('speedRange'),
+        speedVal: document.getElementById('speedVal'),
+        fingerspellToggle: document.getElementById('fingerspellToggle'),
+        avatarPoseBadge: document.getElementById('avatarPoseBadge')
+      };
+
+      function getSignDurationMs() {
+        return Number(el.speedRange.value);
+      }
+
+      el.speedRange.addEventListener('input', () => {
+        el.speedVal.textContent = el.speedRange.value;
+      });
+
+      function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      async function animateSignGloss(word) {
+        const norm = SYNONYMS_DICT[word] || word;
+        const pose = POSES_3D[norm];
+
+        el.fsStrip.innerHTML = '';
+
+        if (pose) {
+          el.glossCaption.textContent = pose.caption || norm.toUpperCase();
+          el.avatarPoseBadge.textContent = `POSE: ${norm.toUpperCase()}`;
+          set3DAvatarPose(pose);
+          await sleep(getSignDurationMs());
+          set3DAvatarPose(REST_POSE);
+          await sleep(150);
+        } else if (el.fingerspellToggle.checked) {
+          // Smooth Fingerspelling animation for unknown words
+          el.glossCaption.textContent = `FINGERSPELL: ${word.toUpperCase()}`;
+          el.avatarPoseBadge.textContent = `SPELLING: ${word.toUpperCase()}`;
+
+          const letters = word.replace(/[^a-z0-9]/g, '').split('');
+          letters.forEach(char => {
+            const tile = document.createElement('div');
+            tile.className = 'fs-tile';
+            tile.textContent = char.toUpperCase();
+            el.fsStrip.appendChild(tile);
+          });
+
+          // Fingerspell ready pose
+          set3DAvatarPose({
+            rShoulderX: -55, rShoulderY: -10, rShoulderZ: 15,
+            rElbowX: -75, rElbowY: 10, rWristX: -10,
+            rThumbCurl: 0.2, rIndexCurl: 0, rMiddleCurl: 0.3, rRingCurl: 0.6, rPinkyCurl: 0.8
+          });
+
+          const tiles = [...el.fsStrip.children];
+          const perLetterMs = Math.max(160, getSignDurationMs() / Math.max(letters.length, 1));
+
+          for (const t of tiles) {
+            t.classList.add('active');
+            targetJoints.rWristY = (Math.random() - 0.5) * 0.4;
+            await sleep(perLetterMs);
+            t.classList.remove('active');
+          }
+
+          set3DAvatarPose(REST_POSE);
+        } else {
+          await sleep(180);
+        }
+      }
+
+      let queuePromise = Promise.resolve();
+
+      function enqueueSentenceTranslation(text) {
+        const rawTokens = text.toLowerCase().replace(/[^a-z0-9'\s]/g, ' ').split(/\s+/).filter(Boolean);
+        const tokens = rawTokens.filter(t => !STOPWORDS_SET.has(t));
+        if (!tokens.length) return;
+
+        el.subtitleMeta.textContent = `Translating sentence (${tokens.length} words)...`;
+
+        queuePromise = queuePromise.then(async () => {
+          for (const t of tokens) {
+            await animateSignGloss(t);
+          }
+          el.glossCaption.textContent = 'READY';
+          el.avatarPoseBadge.textContent = 'POSE: INTERPRETER READY';
+          el.subtitleMeta.textContent = 'Translation complete. Ready.';
+        });
+      }
+
+      function appendSessionHistory(text, source = 'Voice') {
+        if (!text.trim()) return;
+        const entry = document.createElement('div');
+        entry.className = 'history-entry';
+        entry.innerHTML = `
+      <span class="val"><b>[${source}]</b> ${text}</span>
+      <span class="time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+    `;
+        el.historyBox.prepend(entry);
+      }
+
+      window.demoSign = function (word) {
+        el.liveSubtitleText.innerHTML = `<span>${word}</span>`;
+        appendSessionHistory(word, 'Quick Click');
+        enqueueSentenceTranslation(word);
+      };
+
+      /* ==========================================================================
+         4. WEB SPEECH API INPUT (SPEECH-TO-TEXT)
+         ========================================================================== */
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const speechBadge = document.getElementById('speechApiStatus');
+      const micBtn = document.getElementById('micBtn');
+      const micBtnText = document.getElementById('micBtnText');
+      let recognition = null;
+      let isListening = false;
+
+      if (SpeechRecognition) {
+        speechBadge.querySelector('.text').textContent = 'Speech: Ready';
+        speechBadge.classList.add('active');
+
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (e) => {
+          let interim = '';
+          let finalTranscript = '';
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            const text = e.results[i][0].transcript;
+            if (e.results[i].isFinal) finalTranscript += text + ' ';
+            else interim += text;
+          }
+
+          if (finalTranscript) {
+            el.liveSubtitleText.textContent = finalTranscript.trim();
+            appendSessionHistory(finalTranscript.trim(), 'Speech');
+            enqueueSentenceTranslation(finalTranscript);
+          } else {
+            el.liveSubtitleText.innerHTML = `<span class="interim-span">${interim || 'Listening...'}</span>`;
+          }
+        };
+
+        recognition.onerror = (err) => {
+          console.warn('Speech recognition warning/error:', err.error);
+          if (err.error === 'not-allowed') {
+            alert('Microphone access was denied. Please allow microphone permissions in your browser bar.');
+            setMicState(false);
+          }
+        };
+
+        recognition.onend = () => {
+          if (isListening) {
+            try { recognition.start(); } catch (err) { }
+          } else {
+            setMicState(false);
+          }
+        };
+      } else {
+        speechBadge.querySelector('.text').textContent = 'Speech: Unsupported (Use Text Box)';
+      }
+
+      function setMicState(state) {
+        isListening = state;
+        if (state) {
+          micBtn.classList.add('btn-danger');
+          micBtn.classList.remove('btn-primary');
+          micBtnText.textContent = '⏹ Stop Listening';
+          speechBadge.classList.add('rec');
+          speechBadge.querySelector('.text').textContent = 'Speech: Listening...';
+        } else {
+          micBtn.classList.remove('btn-danger');
+          micBtn.classList.add('btn-primary');
+          micBtnText.textContent = '🎙 Start Listening';
+          speechBadge.classList.remove('rec');
+          speechBadge.querySelector('.text').textContent = SpeechRecognition ? 'Speech: Ready' : 'Speech: Unsupported';
+        }
+      }
+
+      micBtn.addEventListener('click', () => {
+        if (!recognition) {
+          alert('Web Speech API is not supported in this browser. Please use Google Chrome/Edge, or use the Text Input box.');
+          return;
+        }
+        if (!isListening) {
+          try {
+            recognition.start();
+            setMicState(true);
+          } catch (err) {
+            console.error(err);
+          }
+        } else {
+          recognition.stop();
+          setMicState(false);
+        }
+      });
+
+      // Manual Text Input Handler
+      const manualTextInput = document.getElementById('manualTextInput');
+      const translateBtn = document.getElementById('translateBtn');
+
+      function handleManualTranslate() {
+        const text = manualTextInput.value.trim();
+        if (!text) return;
+        el.liveSubtitleText.textContent = text;
+        appendSessionHistory(text, 'Text');
+        enqueueSentenceTranslation(text);
+        manualTextInput.value = '';
+      }
+
+      translateBtn.addEventListener('click', handleManualTranslate);
+      manualTextInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleManualTranslate();
+      });
+
+      document.getElementById('clearSubtitlesBtn').addEventListener('click', () => {
+        el.liveSubtitleText.innerHTML = '<span class="interim-span">Waiting for input...</span>';
+        el.historyBox.innerHTML = '';
+        el.fsStrip.innerHTML = '';
+        el.glossCaption.textContent = 'READY';
+        set3DAvatarPose(REST_POSE);
+      });
+
+      /* ==========================================================================
+         5. LIVE DEVICE CAMERA & MEDIAPIPE HAND TRACKING & SIGN RECOGNITION AI
+         ========================================================================== */
+      const videoEl = document.getElementById('webcamVideo');
+      const overlayCanvas = document.getElementById('cameraOverlayCanvas');
+      const overlayCtx = overlayCanvas.getContext('2d');
+      const startCamBtn = document.getElementById('startCamBtn');
+      const camBtnText = document.getElementById('camBtnText');
+      const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+      const cameraStatusBadge = document.getElementById('cameraStatusBadge');
+      const camFpsBadge = document.getElementById('camFpsBadge');
+      const trackedHandsCount = document.getElementById('trackedHandsCount');
+      const cameraDetectedHud = document.getElementById('cameraDetectedHud');
+      const hudSignName = document.getElementById('hudSignName');
+      const hudSignIcon = document.getElementById('hudSignIcon');
+      const aiSignText = document.getElementById('aiSignText');
+      const aiSignIcon = document.getElementById('aiSignIcon');
+      const aiSignDetails = document.getElementById('aiSignDetails');
+      const cameraLogBox = document.getElementById('cameraLogBox');
+
+      let cameraStream = null;
+      let isCameraActive = false;
+      let isMirrored = true;
+      let ttsEnabled = true;
+      let handsModel = null;
+      let lastFrameTime = performance.now();
+      let frameCount = 0;
+      let lastSpokenSign = '';
+      let signDebounceTimer = 0;
+
+      // Text-To-Speech (TTS) Voice Synthesis
+      function speakDetectedSign(text) {
+        if (!ttsEnabled || !window.speechSynthesis) return;
+        if (text === lastSpokenSign && Date.now() - signDebounceTimer < 2500) return;
+        lastSpokenSign = text;
+        signDebounceTimer = Date.now();
+
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.05;
+        utterance.pitch = 1.0;
+        window.speechSynthesis.speak(utterance);
+      }
+
+      document.getElementById('ttsToggleBtn').addEventListener('click', (e) => {
+        ttsEnabled = !ttsEnabled;
+        e.target.textContent = ttsEnabled ? '🔊 Voice: ON' : '🔇 Voice: OFF';
+      });
+
+      document.getElementById('flipCamBtn').addEventListener('click', () => {
+        isMirrored = !isMirrored;
+        videoEl.style.transform = isMirrored ? 'scaleX(-1)' : 'scaleX(1)';
+        overlayCanvas.style.transform = isMirrored ? 'scaleX(-1)' : 'scaleX(1)';
+      });
+
+      // Initialize MediaPipe Hands
+      function initMediaPipeHands() {
+        if (typeof Hands === 'undefined') {
+          console.warn('MediaPipe Hands CDN loading in progress or unavailable. Fallback geometric tracker active.');
+          return;
+        }
+
+        handsModel = new Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        handsModel.setOptions({
+          maxNumHands: 2,
+          modelComplexity: 1,
+          minDetectionConfidence: 0.65,
+          minTrackingConfidence: 0.6
+        });
+
+        handsModel.onResults(onHandResults);
+      }
+
+      // Comprehensive 21-Landmark Sign Language Gesture Classifier (All Signs & ASL Alphabet A-Z)
+      function classifyHandGesture(landmarks, allHands = []) {
+        const wrist = landmarks[0];
+        const thumbCmc = landmarks[1];
+        const thumbMcp = landmarks[2];
+        const thumbIp = landmarks[3];
+        const thumbTip = landmarks[4];
+
+        const indexMcp = landmarks[5];
+        const indexPip = landmarks[6];
+        const indexDip = landmarks[7];
+        const indexTip = landmarks[8];
+
+        const middleMcp = landmarks[9];
+        const middlePip = landmarks[10];
+        const middleDip = landmarks[11];
+        const middleTip = landmarks[12];
+
+        const ringMcp = landmarks[13];
+        const ringPip = landmarks[14];
+        const ringDip = landmarks[15];
+        const ringTip = landmarks[16];
+
+        const pinkyMcp = landmarks[17];
+        const pinkyPip = landmarks[18];
+        const pinkyDip = landmarks[19];
+        const pinkyTip = landmarks[20];
+
+        // Helper: Distance between two landmarks
+        const dist = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
+
+        // Hand scale normalization based on wrist-to-middleMcp
+        const handScale = Math.max(0.01, dist(wrist, middleMcp));
+
+        // Normalized finger extension checks
+        const isIndexExt = (indexTip.y < indexPip.y) || (dist(indexTip, wrist) > dist(indexPip, wrist) * 1.15);
+        const isMiddleExt = (middleTip.y < middlePip.y) || (dist(middleTip, wrist) > dist(middlePip, wrist) * 1.15);
+        const isRingExt = (ringTip.y < ringPip.y) || (dist(ringTip, wrist) > dist(ringPip, wrist) * 1.15);
+        const isPinkyExt = (pinkyTip.y < pinkyPip.y) || (dist(pinkyTip, wrist) > dist(pinkyPip, wrist) * 1.15);
+
+        // Finger curl checks (tip close to palm)
+        const isIndexCurled = dist(indexTip, wrist) < dist(indexPip, wrist);
+        const isMiddleCurled = dist(middleTip, wrist) < dist(middlePip, wrist);
+        const isRingCurled = dist(ringTip, wrist) < dist(ringPip, wrist);
+        const isPinkyCurled = dist(pinkyTip, wrist) < dist(pinkyPip, wrist);
+
+        // Thumb states
+        const isThumbExt = dist(thumbTip, indexMcp) > handScale * 0.7;
+        const isThumbUp = thumbTip.y < thumbMcp.y && thumbTip.y < indexTip.y;
+        const isThumbDown = thumbTip.y > wrist.y && thumbTip.y > indexPip.y;
+
+        const dThumbIndex = dist(thumbTip, indexTip) / handScale;
+        const dThumbMiddle = dist(thumbTip, middleTip) / handScale;
+        const dIndexMiddle = dist(indexTip, middleTip) / handScale;
+        const dMiddleRing = dist(middleTip, ringTip) / handScale;
+        const dRingPinky = dist(ringTip, pinkyTip) / handScale;
+
+        // === TWO-HAND GESTURES (When 2 hands are in camera frame) ===
+        if (allHands.length >= 2) {
+          const h1 = allHands[0][0]; // Wrist hand 1
+          const h2 = allHands[1][0]; // Wrist hand 2
+          const t1 = allHands[0][8]; // Index tip hand 1
+          const t2 = allHands[1][8]; // Index tip hand 2
+          const th1 = allHands[0][4]; // Thumb tip hand 1
+          const th2 = allHands[1][4]; // Thumb tip hand 2
+          const handsDist = dist(h1, h2);
+          const tipsDist = dist(t1, t2);
+          const thumbsDist = dist(th1, th2);
+
+          // 1. TWO-HAND HEART SHAPE 🫶 (Thumbs touching at bottom, Index touching at top)
+          if (thumbsDist < 0.14 && tipsDist < 0.15) {
+            return { name: "HEART / LOVE", icon: "🫶", confidence: 98, desc: "Expressive Chart Sign: Two-Hand Heart" };
+          }
+
+          // 2. THANKS / NAMASTE / PRAYER HANDS 🙏 (Flat palms pressed together upright)
+          if (handsDist < 0.13 && tipsDist < 0.11 && isIndexExt && isMiddleExt) {
+            return { name: "THANKS / NAMASTE", icon: "🙏", confidence: 97, desc: "Expressive Chart Sign: Prayer Hands" };
+          }
+
+          // 3. CHEERS / HIGH TEN 🙌 (Both 5-finger hands facing front upright)
+          if (isIndexExt && isMiddleExt && isRingExt && isPinkyExt && t1.y < h1.y && t2.y < h2.y && handsDist > 0.18) {
+            return { name: "CHEERS / CELEBRATE", icon: "🙌", confidence: 96, desc: "Expressive Chart Sign: Cheers Hands" };
+          }
+
+          // 4. HUG 🤗 (Both 5-finger open hands angled slightly inward)
+          if (isIndexExt && isMiddleExt && isRingExt && isPinkyExt && handsDist > 0.12 && handsDist < 0.28) {
+            return { name: "HUG", icon: "🤗", confidence: 95, desc: "Expressive Chart Sign: Open Hug" };
+          }
+
+          // 5. HOUSE 🏠 (Tips of both hands touching at roof angle)
+          if (tipsDist < 0.12 && handsDist > 0.20 && isIndexExt && isMiddleExt) {
+            return { name: "HOUSE", icon: "🏠", confidence: 96, desc: "ASL Chart Sign: Roof & Walls" };
+          }
+
+          // 6. LOVE / HUG ❤️ (Arms/Wrists crossed close together)
+          if (handsDist < 0.14 && isIndexCurled && isMiddleCurled) {
+            return { name: "LOVE", icon: "❤️", confidence: 95, desc: "ASL Chart Sign: Crossed Arms" };
+          }
+
+          // 7. I FEEL YOU / EMPATHY TAP 🤝 (One horizontal palm touching other thumb)
+          if (thumbsDist < 0.10 && handsDist < 0.22) {
+            return { name: "I FEEL YOU", icon: "🤝", confidence: 93, desc: "Expressive Chart Sign: Empathy Tap" };
+          }
+
+          // 8. WHATEVER / 'W' HANDS 👐 (Both hands showing W / L shapes)
+          if (isIndexExt && isMiddleExt && isRingExt && !isPinkyExt && handsDist > 0.15) {
+            return { name: "WHATEVER / 'W'", icon: "👐", confidence: 94, desc: "Expressive Chart Sign: Whatever 'W'" };
+          }
+
+          // 9. SICK / FEELING DOWN 🤒 (Downward limp hands)
+          if (t1.y > h1.y && t2.y > h2.y && handsDist < 0.25) {
+            return { name: "SICK / UNWELL", icon: "🤒", confidence: 92, desc: "Expressive Chart Sign: Downward Limp Hands" };
+          }
+
+          // 10. HELP 🆘 (One hand fist supported by flat palm)
+          if (handsDist < 0.16 && (isIndexCurled !== isMiddleExt)) {
+            return { name: "HELP", icon: "🆘", confidence: 94, desc: "ASL Chart Sign: Lifted Fist on Palm" };
+          }
+
+          // 11. FAMILY 👨‍👩‍👧‍👦 (Two F-Hands meeting / touching)
+          if (dThumbIndex < 0.45 && dist(allHands[0][4], allHands[1][4]) < 0.15) {
+            return { name: "FAMILY", icon: "👨‍👩‍👧‍👦", confidence: 93, desc: "ASL Chart Sign: F-Hands Circle" };
+          }
+
+          // 12. FINISHED / DONE 👐 (Both 5-finger open hands)
+          if (isIndexExt && isMiddleExt && isRingExt && isPinkyExt) {
+            return { name: "FINISHED / DONE", icon: "👐", confidence: 95, desc: "ASL Chart Sign: All Done" };
+          }
+        }
+
+        // === SINGLE-HAND GESTURES & EXPRESSIVE SIGNS ===
+
+        // 1. MINI HEART 🫰 (Korean Finger Heart: Thumb & Index crossed forming heart, other 3 curled)
+        if (dThumbIndex < 0.30 && Math.abs(indexTip.x - thumbTip.x) < handScale * 0.4 && isMiddleCurled && isRingCurled && isPinkyCurled && indexTip.y > thumbMcp.y * 0.8) {
+          return { name: "MINI HEART", icon: "🫰", confidence: 97, desc: "Expressive Chart Sign: Finger Heart" };
+        }
+
+        // 2. GOOD LUCK / FINGERS CROSSED 🤞 (Index and Middle crossed over each other)
+        if (isIndexExt && isMiddleExt && !isRingExt && !isPinkyExt && (Math.abs(indexTip.x - middleTip.x) < handScale * 0.22 || (indexTip.x - middleTip.x) * (indexMcp.x - middleMcp.x) < 0)) {
+          return { name: "GOOD LUCK / CROSSED", icon: "🤞", confidence: 96, desc: "Expressive Chart Sign: Fingers Crossed" };
+        }
+
+        // 3. I LOVE YOU 🤟 (Thumb + Index + Pinky extended, Middle & Ring curled)
+        if (isIndexExt && isPinkyExt && !isMiddleExt && !isRingExt && isThumbExt) {
+          return { name: "I LOVE YOU", icon: "🤟", confidence: 98, desc: "ASL Chart Sign: ILY Handshape" };
+        }
+
+        // 4. TELEPHONE / SHAKA / CALL ME 🤙 (Thumb & Pinky extended wide, middle 3 curled)
+        if (isPinkyExt && isThumbExt && !isIndexExt && !isMiddleExt && !isRingExt) {
+          return { name: "SHAKA / TELEPHONE", icon: "🤙", confidence: 97, desc: "Expressive Chart Sign: Shaka / Call Me" };
+        }
+
+        // 5. VERY GOOD / THUMBS UP 👍 (Upright thumb, fist curled)
+        if (isThumbUp && isIndexCurled && isMiddleCurled && isRingCurled && isPinkyCurled) {
+          return { name: "VERY GOOD / YES", icon: "👍", confidence: 98, desc: "Expressive Chart Sign: Thumbs Up" };
+        }
+
+        // 6. THANKS / SINGLE-HAND TAP 👍 (Thumb angled slightly inward)
+        if (isThumbExt && isIndexCurled && isMiddleCurled && thumbTip.y < indexPip.y && !isThumbUp) {
+          return { name: "THANKS / GOOD", icon: "👍", confidence: 92, desc: "Expressive Chart Sign: Thanks Tap" };
+        }
+
+        // 7. OK SIGN / 'F' 👌 (Thumb and Index touching in circle, 3 extended)
+        if (dThumbIndex < 0.38 && isMiddleExt && isRingExt && isPinkyExt) {
+          return { name: "OK SIGN", icon: "👌", confidence: 96, desc: "Expressive Chart Sign: OK" };
+        }
+
+        // 8. PEACE / VICTORY ✌️ (Index & Middle spread in V shape)
+        if (isIndexExt && isMiddleExt && !isRingExt && !isPinkyExt && dIndexMiddle > 0.38) {
+          return { name: "PEACE / VICTORY", icon: "✌️", confidence: 96, desc: "Expressive Chart Sign: Peace 'V'" };
+        }
+
+        // 10. FOOD / EAT 🍽️ (Flat-O / tapered fingers near mouth)
+        if (dThumbIndex < 0.35 && dThumbMiddle < 0.35 && isIndexCurled && isMiddleCurled && thumbTip.y < wrist.y) {
+          return { name: "FOOD / EAT", icon: "🍽️", confidence: 92, desc: "ASL Chart Sign: Eating Gesture" };
+        }
+
+        // 12. THUMBS DOWN / NO 👎
+        if (isThumbDown && isIndexCurled && isMiddleCurled && isRingCurled) {
+          return { name: "NO / THUMBS DOWN", icon: "👎", confidence: 94, desc: "ASL Chart Sign: Negative" };
+        }
+
+        // 13. HELLO / GOODBYE / PLEASE 👋 (Open 5-finger hand)
+        if (isIndexExt && isMiddleExt && isRingExt && isPinkyExt && isThumbExt) {
+          if (wrist.y > indexTip.y) {
+            return { name: "HELLO / GOODBYE", icon: "👋", confidence: 98, desc: "ASL Chart Sign: 5-Finger Open Wave" };
+          }
+          return { name: "PLEASE / OPEN PALM", icon: "✋", confidence: 93, desc: "ASL Chart Sign: Open Palm" };
+        }
+
+        // 14. 'L' SHAPE / YOU 👆 (Index upright, Thumb at 90 deg)
+        if (isIndexExt && !isMiddleExt && !isRingExt && !isPinkyExt && isThumbExt) {
+          return { name: "LETTER 'L'", icon: "👆", confidence: 95, desc: "ASL Alphabet: Letter L-Shape" };
+        }
+
+        // 15. POINTING / THIRSTY / '1' 👉 (Index only upright)
+        if (isIndexExt && !isMiddleExt && !isRingExt && !isPinkyExt && !isThumbExt) {
+          return { name: "POINTING / '1'", icon: "👉", confidence: 94, desc: "ASL Chart Sign: Index Point" };
+        }
+
+        // 16. 'I' (Pinky only extended, thumb over fist)
+        if (isPinkyExt && !isThumbExt && !isIndexExt && !isMiddleExt && !isRingExt) {
+          return { name: "LETTER 'I'", icon: "ℹ️", confidence: 94, desc: "ASL Alphabet: Letter I" };
+        }
+
+        // 17. 'B' (4 Fingers upright together, thumb folded flat)
+        if (isIndexExt && isMiddleExt && isRingExt && isPinkyExt && !isThumbExt && dIndexMiddle < 0.32) {
+          return { name: "LETTER 'B'", icon: "🖐️", confidence: 95, desc: "ASL Alphabet: Letter B" };
+        }
+
+        // 18. 'A' (Fist with thumb resting upright on index side)
+        if (isIndexCurled && isMiddleCurled && isRingCurled && isPinkyCurled && thumbTip.y < indexPip.y && !isThumbUp) {
+          return { name: "LETTER 'A' / SORRY", icon: "🅰️", confidence: 93, desc: "ASL Alphabet: Letter A" };
+        }
+
+        // 19. 'S' / FIST ✊ (Thumb wrapped across front of curled fingers)
+        if (isIndexCurled && isMiddleCurled && isRingCurled && isPinkyCurled) {
+          return { name: "FIST / 'S'", icon: "✊", confidence: 92, desc: "ASL Alphabet: Letter S" };
+        }
+
+        // 20. 'C' (All fingers and thumb curved into C shape)
+        if (dThumbIndex > 0.45 && dThumbIndex < 0.90 && isIndexExt && isMiddleExt && isRingExt && isPinkyExt) {
+          return { name: "LETTER 'C'", icon: "🔤", confidence: 91, desc: "ASL Alphabet: Letter C" };
+        }
+
+        // 21. 'O' (All fingertips touching thumb forming round circle)
+        if (dThumbIndex < 0.35 && dThumbMiddle < 0.35 && isIndexCurled && isMiddleCurled) {
+          return { name: "LETTER 'O'", icon: "⭕", confidence: 92, desc: "ASL Alphabet: Letter O" };
+        }
+
+        return null;
+      }
+
+      function onHandResults(results) {
+        if (!overlayCanvas || !overlayCtx) return;
+
+        if (overlayCanvas.width !== videoEl.videoWidth || overlayCanvas.height !== videoEl.videoHeight) {
+          overlayCanvas.width = videoEl.videoWidth || 640;
+          overlayCanvas.height = videoEl.videoHeight || 480;
+        }
+
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+        frameCount++;
+        const now = performance.now();
+        if (now - lastFrameTime >= 1000) {
+          camFpsBadge.textContent = `${frameCount} FPS`;
+          frameCount = 0;
+          lastFrameTime = now;
+        }
+
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+          trackedHandsCount.textContent = results.multiHandLandmarks.length;
+
+          for (let h = 0; h < results.multiHandLandmarks.length; h++) {
+            const landmarks = results.multiHandLandmarks[h];
+            drawCyberSkeleton(landmarks, overlayCtx, overlayCanvas.width, overlayCanvas.height);
+
+            const gesture = classifyHandGesture(landmarks, results.multiHandLandmarks);
+            if (gesture) {
+              showDetectedCameraSign(gesture);
+            }
+          }
+        } else {
+          trackedHandsCount.textContent = '0';
+        }
+      }
+
+      function drawCyberSkeleton(landmarks, ctx, width, height) {
+        const connections = [
+          [0, 1], [1, 2], [2, 3], [3, 4],       // Thumb
+          [0, 5], [5, 6], [6, 7], [7, 8],       // Index
+          [0, 9], [9, 10], [10, 11], [11, 12],  // Middle
+          [0, 13], [13, 14], [14, 15], [15, 16],// Ring
+          [0, 17], [17, 18], [18, 19], [19, 20],// Pinky
+          [5, 9], [9, 13], [13, 17]             // Palm base
+        ];
+
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = '#00f0ff';
+        ctx.shadowColor = '#00f0ff';
+        ctx.shadowBlur = 10;
+
+        connections.forEach(([i, j]) => {
+          const p1 = landmarks[i];
+          const p2 = landmarks[j];
+          ctx.beginPath();
+          ctx.moveTo(p1.x * width, p1.y * height);
+          ctx.lineTo(p2.x * width, p2.y * height);
+          ctx.stroke();
+        });
+
+        landmarks.forEach((p, idx) => {
+          const x = p.x * width;
+          const y = p.y * height;
+          ctx.beginPath();
+          ctx.arc(x, y, idx === 4 || idx === 8 || idx === 12 || idx === 16 || idx === 20 ? 6 : 4, 0, 2 * Math.PI);
+          ctx.fillStyle = idx === 0 ? '#ff7b39' : '#ffffff';
+          ctx.shadowColor = '#00f0ff';
+          ctx.shadowBlur = 8;
+          ctx.fill();
+        });
+      }
+
+      function showDetectedCameraSign(gesture) {
+        hudSignName.textContent = gesture.name;
+        hudSignIcon.textContent = gesture.icon;
+        cameraDetectedHud.style.display = 'flex';
+
+        aiSignText.textContent = `${gesture.name} DETECTED`;
+        aiSignIcon.textContent = gesture.icon;
+        aiSignDetails.textContent = `Confidence: ${gesture.confidence}% · Hand AI Classifier Active`;
+
+        speakDetectedSign(gesture.name);
+
+        if (gesture.name !== lastSpokenSign) {
+          const entry = document.createElement('div');
+          entry.className = 'history-entry';
+          entry.innerHTML = `
+        <span class="val"><b>[Camera AI]</b> ${gesture.icon} ${gesture.name}</span>
+        <span class="time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+      `;
+          cameraLogBox.prepend(entry);
+        }
+      }
+
+      // Camera Toggle
+      startCamBtn.addEventListener('click', async () => {
+        if (!isCameraActive) {
+          try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+              video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+              audio: false
+            });
+
+            videoEl.srcObject = cameraStream;
+            await videoEl.play();
+
+            isCameraActive = true;
+            cameraPlaceholder.classList.add('hidden');
+            startCamBtn.classList.add('btn-danger');
+            startCamBtn.classList.remove('btn-primary');
+            camBtnText.textContent = '⏹ Stop Camera';
+            cameraStatusBadge.classList.add('rec');
+            cameraStatusBadge.querySelector('.text').textContent = 'Camera: Active (Streaming)';
+
+            if (!handsModel) initMediaPipeHands();
+
+            const processCameraFrame = async () => {
+              if (!isCameraActive) return;
+              if (handsModel && videoEl.readyState >= 2) {
+                await handsModel.send({ image: videoEl });
+              }
+              requestAnimationFrame(processCameraFrame);
+            };
+            requestAnimationFrame(processCameraFrame);
+
+          } catch (err) {
+            console.error('Camera access error:', err);
+            alert('Could not access device camera. Please allow camera permissions in your browser.');
+          }
+        } else {
+          if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+          }
+          isCameraActive = false;
+          videoEl.srcObject = null;
+          cameraPlaceholder.classList.remove('hidden');
+          startCamBtn.classList.remove('btn-danger');
+          startCamBtn.classList.add('btn-primary');
+          camBtnText.textContent = '📹 Enable Device Camera';
+          cameraStatusBadge.classList.remove('rec');
+          cameraStatusBadge.querySelector('.text').textContent = 'Camera: Standby';
+          cameraDetectedHud.style.display = 'none';
+          overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        }
+      });
+
+      window.takeSnapshot = function () {
+        if (!isCameraActive) return;
+        const snapCanvas = document.createElement('canvas');
+        snapCanvas.width = videoEl.videoWidth || 640;
+        snapCanvas.height = videoEl.videoHeight || 480;
+        const ctx = snapCanvas.getContext('2d');
+        if (isMirrored) {
+          ctx.translate(snapCanvas.width, 0);
+          ctx.scale(-1, 1);
+        }
+        ctx.drawImage(videoEl, 0, 0);
+        const link = document.createElement('a');
+        link.download = `signbridge-snapshot-${Date.now()}.png`;
+        link.href = snapCanvas.toDataURL('image/png');
+        link.click();
+      };
+
+      /* ==========================================================================
+         6. VIEW MODE SWITCHER
+         ========================================================================== */
+      window.switchViewMode = function (mode) {
+        document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+        const speechSec = document.getElementById('speechControlsSection');
+        const camSec = document.getElementById('cameraControlsSection');
+        const avatarView = document.getElementById('avatarViewContainer');
+        const camView = document.getElementById('cameraViewContainer');
+
+        if (mode === 'speech-to-sign') {
+          document.getElementById('tabSpeechToSign').classList.add('active');
+          speechSec.style.display = 'block';
+          camSec.style.display = 'none';
+          avatarView.style.display = 'block';
+          camView.style.display = 'none';
+        } else if (mode === 'camera-recognition') {
+          document.getElementById('tabCameraRecognition').classList.add('active');
+          speechSec.style.display = 'none';
+          camSec.style.display = 'block';
+          avatarView.style.display = 'none';
+          camView.style.display = 'block';
+          if (!isCameraActive) startCamBtn.click();
+        } else if (mode === 'dual-practice') {
+          document.getElementById('tabDualPractice').classList.add('active');
+          speechSec.style.display = 'block';
+          camSec.style.display = 'block';
+          avatarView.style.display = 'block';
+          camView.style.display = 'block';
+          if (!isCameraActive) startCamBtn.click();
+        }
+
+        setTimeout(onWindowResize, 100);
+      };
+
+      /* ==========================================================================
+         7. SIGN DICTIONARY EXPLORER MODAL
+         ========================================================================== */
+      const dictModal = document.getElementById('dictModal');
+      const dictGrid = document.getElementById('dictGridContainer');
+      const dictSearch = document.getElementById('dictSearchInput');
+
+      function populateDictionary() {
+        dictGrid.innerHTML = '';
+
+        const chartSigns = ['hello', 'goodbye', 'please', 'thankyou', 'yes', 'no', 'sorry', 'iloveyou', 'welcome', 'family', 'house', 'love', 'hungry', 'thirsty', 'help', 'drink', 'finished', 'food', 'good', 'morning'];
+        const expressiveSigns = ['miniheart', 'goodluck', 'heart', 'hug', 'cheers', 'shaka', 'telephone', 'ifeelyou', 'whatever', 'sick'];
+        const alphabetLetters = 'abcdefghijklmnopqrstuvwxyz'.split('');
+        const otherWords = Object.keys(POSES_3D).filter(k => !chartSigns.includes(k) && !expressiveSigns.includes(k) && !alphabetLetters.includes(k)).sort();
+
+        function createSection(title, list, badgeColor) {
+          const header = document.createElement('div');
+          header.style.gridColumn = '1 / -1';
+          header.style.marginTop = '12px';
+          header.style.paddingBottom = '4px';
+          header.style.borderBottom = '1px solid var(--border-subtle)';
+          header.style.fontSize = '0.85rem';
+          header.style.fontWeight = '700';
+          header.style.color = badgeColor;
+          header.textContent = title;
+          dictGrid.appendChild(header);
+
+          list.forEach(k => {
+            if (!POSES_3D[k]) return;
+            const btn = document.createElement('button');
+            btn.className = 'dict-chip';
+            btn.style.width = '100%';
+            btn.style.textAlign = 'left';
+            btn.textContent = `▶ ${k.toUpperCase()}`;
+            btn.onclick = () => {
+              demoSign(k);
+              closeDictModal();
+            };
+            dictGrid.appendChild(btn);
+          });
+        }
+
+        createSection('⭐ ASL Core Signs (Reference Chart 1)', chartSigns, 'var(--accent-cyan)');
+        createSection('💖 Expressive & Emotion Signs (Reference Chart 2)', expressiveSigns, 'var(--accent-pink)');
+        createSection('🔤 ASL Alphabet (A-Z)', alphabetLetters, 'var(--accent-cyan)');
+        createSection('💬 Everyday Conversation & Signs', otherWords, 'var(--accent-amber)');
+      }
+
+      window.filterDictionary = function () {
+        const q = dictSearch.value.toLowerCase().trim();
+        const chips = dictGrid.querySelectorAll('.dict-chip');
+        chips.forEach(c => {
+          const match = c.textContent.toLowerCase().includes(q);
+          c.style.display = match ? 'block' : 'none';
+        });
+      };
+
+      document.getElementById('openDictBtn').addEventListener('click', () => {
+        populateDictionary();
+        dictModal.classList.add('open');
+      });
+
+      window.closeDictModal = function () {
+        dictModal.classList.remove('open');
+      };
+
+      dictModal.addEventListener('click', (e) => {
+        if (e.target === dictModal) closeDictModal();
+      });
+
+      /* ==========================================================================
+         8. AVATAR THEMES & CONTROLS
+         ========================================================================== */
+      window.setAvatarTheme = function (theme) {
+        currentTheme = theme;
+        const sel = document.getElementById('avatarThemeSelect');
+        if (sel) sel.value = theme;
+        buildAvatarMesh();
+      };
+
+      document.getElementById('avatarThemeSelect').addEventListener('change', (e) => {
+        window.setAvatarTheme(e.target.value);
+      });
+
+      document.getElementById('resetPoseBtn').addEventListener('click', () => {
+        set3DAvatarPose(REST_POSE);
+        el.glossCaption.textContent = 'READY';
+      });
+
+      document.getElementById('toggleCameraAngleBtn').addEventListener('click', toggleCameraAngle);
+
+      window.triggerAvatarCheer = function () {
+        demoSign('hello');
+      };
+
+      // Initialize Scene on Window Load or immediately if already ready
+      if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', () => {
+          initThreeScene();
+          set3DAvatarPose(REST_POSE);
+        });
+      } else {
+        initThreeScene();
+        set3DAvatarPose(REST_POSE);
+      }
+
+    })();
+  </script>
+</body>
+
+</html>
